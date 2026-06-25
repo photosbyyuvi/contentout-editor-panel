@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   ACTIVITY_LOG,
   CLIENTS,
@@ -18,68 +11,20 @@ import {
 } from './data'
 import { formatHours } from './format'
 import { defaultNotificationPrefs } from './types'
+import { AppContext, type AppContextValue, type Toast } from './appContext'
 import type {
   ActivityLog,
   AppNotification,
-  Client,
   Delivery,
   NotificationChannel,
-  NotificationPrefs,
   NotificationType,
+  NotificationPrefs,
   Project,
-  ProjectStatus,
   Role,
   ThemeMode,
   TimeEntry,
   User,
 } from './types'
-
-type Toast = { id: number; message: string }
-
-type AppContextValue = {
-  // identity
-  users: User[]
-  clients: Client[]
-  projects: Project[]
-  timeEntries: TimeEntry[]
-  activityLog: ActivityLog[]
-  currentUser: User | null
-  user: User | null // acting user (current, or impersonated via View as)
-  isViewingAs: boolean
-  theme: ThemeMode
-  toast: Toast | null
-  notifications: AppNotification[]
-  unreadCount: number
-  // auth
-  login: (email: string, password: string) => boolean
-  logout: () => void
-  enterViewAs: (userId: string) => void
-  exitViewAs: () => void
-  // ui
-  toggleTheme: () => void
-  showToast: (message: string) => void
-  dismissToast: () => void
-  // editor actions
-  startEditing: (projectId: string) => void
-  submitDelivery: (projectId: string, fileLink: string, note: string) => void
-  addComment: (projectId: string, body: string) => void
-  logHours: (projectId: string, hours: number, dateISO: string) => void
-  // reviewer actions (Part N)
-  approveDelivery: (projectId: string) => void
-  requestChanges: (projectId: string, notes: string[]) => void
-  // owner / admin management (Part L/M)
-  updateProject: (projectId: string, patch: Partial<Project>) => void
-  updateUser: (userId: string, patch: Partial<User>) => void
-  inviteUser: (fullName: string, email: string, role: Role) => void
-  changeRole: (userId: string, role: Role) => void
-  setUserStatus: (userId: string, status: User['status']) => void
-  // notifications
-  markNotificationRead: (id: string) => void
-  markAllNotificationsRead: () => void
-  updateNotificationPrefs: (prefs: NotificationPrefs) => void
-}
-
-const AppContext = createContext<AppContextValue | null>(null)
 
 let counter = 0
 const uid = (prefix: string) => `${prefix}-${++counter}-${Date.now().toString(36)}`
@@ -110,7 +55,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
   const dismissToast = useCallback(() => setToast(null), [])
 
-  const login = useCallback((email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const user = authenticate(email, password)
     if (!user) {
       return false
@@ -544,37 +489,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
 
-export function useApp(): AppContextValue {
-  const context = useContext(AppContext)
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider')
-  }
-  return context
-}
-
-// Projects the acting user is allowed to see (Part L — gated in the data layer).
-export function useVisibleProjects(): Project[] {
-  const { projects, user } = useApp()
-  return useMemo(() => {
-    if (!user) {
-      return []
-    }
-    if (user.role === 'owner' || user.role === 'admin') {
-      return projects
-    }
-    return projects.filter((project) => project.assignedEditorId === user.id)
-  }, [projects, user])
-}
-
-// Projects scoped to the acting user as an editor (their own queue / hours).
-export function useEditorProjects(): Project[] {
-  const { projects, user } = useApp()
-  return useMemo(
-    () => (user ? projects.filter((project) => project.assignedEditorId === user.id) : []),
-    [projects, user],
-  )
-}
-
-export function statusIsApproved(status: ProjectStatus): boolean {
-  return status === 'approved'
-}
+export { useApp, useEditorProjects, useVisibleProjects } from './appContext'

@@ -11,14 +11,22 @@ export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
 
-  const handleSubmit = () => {
-    if (login(email, password)) {
-      setError(null)
-      navigate('/')
-      return
+  const handleSubmit = async () => {
+    setPending(true)
+    try {
+      if (await login(email, password)) {
+        setError(null)
+        navigate('/')
+        return
+      }
+      setError('Those credentials don\'t match an active profile.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Sign-in failed.')
+    } finally {
+      setPending(false)
     }
-    setError('Those credentials don\'t match an active profile.')
   }
 
   const quickFill = (userEmail: string) => {
@@ -82,8 +90,8 @@ export function Login() {
           </p>
         ) : null}
 
-        <button type="submit" className="primary-button signin-submit">
-          Sign in
+        <button type="submit" className="primary-button signin-submit" disabled={pending}>
+          {pending ? 'Signing in…' : 'Sign in'}
         </button>
 
         <div className="signin-demo">

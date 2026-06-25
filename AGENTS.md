@@ -2,16 +2,21 @@
 
 ## Cursor Cloud specific instructions
 
-`contentout-editor-panel` is a **frontend-only** single-page app (Vite + React 19 + TypeScript). There is no backend, database, or external service — the dashboard data is seeded in-memory in `src/App.tsx`, so the dev server is the only thing that needs to run.
+`contentout-editor-panel` is the **Contentout Team Portal** — a Vite + React 19 + TypeScript SPA (`src/`) plus a Node/Express + SQLite backend (`server/`). It runs in two modes, selected by the `VITE_API_URL` env var (see `DEPLOYMENT.md`):
 
-Standard commands live in `package.json` (`scripts`). Quick reference:
+- **Demo mode** (no `VITE_API_URL`): the SPA uses the in-memory mock provider (`src/store.tsx`). Zero config; state resets on reload.
+- **Official mode** (`VITE_API_URL` set, e.g. via `.env.local`): the SPA uses the backend provider (`src/backendStore.tsx`) → real JWT auth, SQLite persistence, server-enforced role permissions, SSE live notifications, and a server-side Anthropic AI proxy.
 
-- Dev server: `npm run dev` (Vite, serves on `http://localhost:5173/`). This is the command to use for development.
-- Lint: `npm run lint` (oxlint, configured by `.oxlintrc.json`).
-- Build: `npm run build` (runs `tsc -b` then `vite build`; output in `dist/`).
-- Preview production build: `npm run preview`.
+Standard commands live in `package.json` (`scripts`):
+
+- Frontend only (demo mode): `npm run dev` (Vite on `http://localhost:5173/`).
+- Full stack (official mode): `npm run dev:all` — runs the API (`server/index.js` on `:8787`) and Vite together. Requires `.env.local` containing `VITE_API_URL=http://localhost:8787`.
+- Backend only: `npm run server`.
+- Lint: `npm run lint` (oxlint). Build: `npm run build` (`tsc -b && vite build`). Preview: `npm run preview`.
 
 Non-obvious notes:
-- Package manager is **npm** (`package-lock.json`); do not switch to pnpm/yarn.
-- Requires Node 20.19+ / 22.12+ for Vite 8. The VM's default Node (v22.x) satisfies this.
-- The lint command (`oxlint`) is fast and has no type-aware rules enabled by default; passing lint does not guarantee type-correctness — rely on `npm run build` (`tsc -b`) for type checking.
+- Package manager is **npm**; Node 22.x. The lint (oxlint) has no type-aware rules — rely on `npm run build` for type checking.
+- `tsc` only compiles `src/` (per `tsconfig.app.json`); the backend in `server/` is plain ESM JS and is not type-checked by the build.
+- The SQLite DB lives at `server/data/portal.db` (gitignored) and seeds itself from `server/seed.js` on first run; delete that file to reset seed data.
+- The frontend data layer is the same `AppContext` interface for both providers (`src/appContext.tsx`); components never call the backend directly — they go through the provider + `src/lib/api.ts`.
+- Auth/session token is held in memory only (no localStorage/sessionStorage), so a hard refresh logs you out in official mode by design.

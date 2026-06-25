@@ -1,6 +1,9 @@
 import { useEffect, type ReactElement } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AppProvider, useApp } from './store'
+import { AppProvider } from './store'
+import { BackendAppProvider } from './backendStore'
+import { useApp } from './appContext'
+import { USE_BACKEND } from './config'
 import { isManager } from './permissions'
 import { Layout } from './components/Layout'
 import { Login } from './components/Login'
@@ -73,12 +76,13 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const Provider = USE_BACKEND ? BackendAppProvider : AppProvider
   return (
-    <AppProvider>
+    <Provider>
       <ThemeSync />
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
-    </AppProvider>
+    </Provider>
   )
 }

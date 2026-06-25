@@ -128,6 +128,8 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
           if (payload.kind === 'notification') {
             setNotifications((prev) => [payload.notification, ...prev])
             showToast(payload.notification.body)
+            // also re-sync data so any open view (project/queue/team) updates live
+            void refresh()
           }
         } catch {
           // ignore non-JSON frames
@@ -146,7 +148,7 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       socket?.close()
       wsRef.current = null
     }
-  }, [currentUserId, showToast])
+  }, [currentUserId, showToast, refresh])
 
   const currentUser = useMemo(
     () => users.find((u) => u.id === currentUserId) ?? null,

@@ -539,6 +539,9 @@ function fallbackChat(input) {
   if (last.includes('review')) {
     return c.inReviewTitles?.length ? `In review: ${c.inReviewTitles.join(', ')}.` : 'Nothing is in review.'
   }
+  if (last.includes('status') || last.includes('update')) {
+    return `Draft status update: wrapped the priority cuts, ${c.inReviewTitles?.length ?? 0} in review and ${c.overdueTitles?.length ?? 0} needing attention. Will deliver the rest on schedule.`
+  }
   return `Here to help, ${c.firstName || 'there'}. Ask what's due, what's in review, or to draft a status update.`
 }
 
@@ -619,7 +622,7 @@ app.post('/api/ai/stream', auth, wrap(async (req, res) => {
     const text = fallbackChat(input)
     for (const word of text.split(' ')) {
       res.write(word + ' ')
-      await new Promise((r) => setTimeout(r, 35))
+      await new Promise((r) => setTimeout(r, 60))
     }
     res.end()
   }

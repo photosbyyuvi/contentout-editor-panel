@@ -60,6 +60,14 @@ export const api = {
     setToken(result.token)
     return result
   },
+  async signup(fullName: string, email: string, password: string): Promise<{ token: string; user: User }> {
+    const result = await request<{ token: string; user: User }>('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ fullName, email, password }),
+    })
+    setToken(result.token)
+    return result
+  },
   bootstrap: () => request<Bootstrap>('/api/bootstrap'),
   startEditing: (projectId: string) =>
     request<{ project: Project }>(`/api/projects/${projectId}/start`, { method: 'POST' }),

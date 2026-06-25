@@ -1398,6 +1398,14 @@ textarea {
 .signin-submit {
   width: 100%;
 }
+.signin-alt {
+  text-align: center;
+  font-size: 13px;
+}
+.signin-alt a {
+  color: var(--text-primary);
+  font-weight: 500;
+}
 
 /* ============================================================
    Toast (Part E5)

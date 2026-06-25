@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
 import { useApp } from '../store'
 import { MOCK_PASSWORD, USERS } from '../data'
 import { ROLE_LABELS } from '../types'
+import { USE_BACKEND } from '../config'
 
 export function Login() {
   const { login, theme, toggleTheme } = useApp()
@@ -93,6 +94,11 @@ export function Login() {
         <button type="submit" className="primary-button signin-submit" disabled={pending}>
           {pending ? 'Signing in…' : 'Sign in'}
         </button>
+        {USE_BACKEND ? (
+          <p className="muted signin-alt">
+            New to the team? <Link to="/signup">Create an account</Link>
+          </p>
+        ) : null}
 
         <div className="signin-demo">
           <p className="signin-demo-label">Demo profiles (password: {MOCK_PASSWORD})</p>

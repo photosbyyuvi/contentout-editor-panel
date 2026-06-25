@@ -16,6 +16,7 @@
 
   --duration-fast: 150ms;
   --duration-mid: 210ms;
+  --duration-slow: 300ms;
   --ease-standard: cubic-bezier(0.2, 0.9, 0.2, 1);
 
   font-family: var(--font-ui);
@@ -192,6 +193,9 @@ button {
   height: 34px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rail-nav {
@@ -201,6 +205,9 @@ button {
 }
 
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
   padding: 10px 12px;
   cursor: pointer;
@@ -225,6 +232,26 @@ button {
   font-size: 0.78rem;
   padding: 10px 12px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.icon-inline {
+  width: 14px;
+  height: 14px;
+}
+
+.nav-icon {
+  opacity: 0.9;
 }
 
 select,
@@ -265,6 +292,12 @@ textarea {
   gap: var(--space-4);
 }
 
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .header-metrics {
   display: grid;
   grid-auto-flow: column;
@@ -279,6 +312,9 @@ textarea {
 }
 
 .header-metrics p {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--text-tertiary);
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -340,6 +376,10 @@ textarea {
 
 .queue-list li {
   animation: fade-up var(--duration-mid) var(--ease-standard);
+  transition:
+    transform var(--duration-slow) var(--ease-standard),
+    opacity var(--duration-mid) var(--ease-standard);
+  will-change: transform;
 }
 
 .queue-card {
@@ -352,11 +392,28 @@ textarea {
   display: grid;
   gap: 6px;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
 .queue-card-active {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev-2));
+}
+
+.queue-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.queue-card-updated::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: queue-update-glow 880ms var(--ease-standard);
+  pointer-events: none;
 }
 
 .queue-client-row {
@@ -699,6 +756,17 @@ a:focus-visible {
   }
 }
 
+@keyframes queue-update-glow {
+  from {
+    opacity: 0.85;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
 @keyframes shimmer {
   from {
     background-position: 200% 0;
@@ -744,6 +812,17 @@ a:focus-visible {
   }
 }
 
+@media (min-width: 1380px) {
+  .workspace-shell {
+    padding: var(--space-5);
+    gap: var(--space-5);
+  }
+
+  .surface-card {
+    padding: var(--space-5);
+  }
+}
+
 @media (max-width: 760px) {
   .workspace-shell {
     padding: var(--space-3);
@@ -773,5 +852,30 @@ a:focus-visible {
     right: var(--space-3);
     left: var(--space-3);
     bottom: var(--space-3);
+  }
+}
+
+@media (min-width: 1121px) {
+  .left-rail-collapsed .brand-lockup p,
+  .left-rail-collapsed .brand-lockup h1,
+  .left-rail-collapsed .nav-label,
+  .left-rail-collapsed .rail-meta label,
+  .left-rail-collapsed .rail-meta select,
+  .left-rail-collapsed .rail-meta .muted,
+  .left-rail-collapsed .theme-toggle span {
+    display: none;
+  }
+
+  .left-rail-collapsed .rail-top {
+    justify-content: center;
+  }
+
+  .left-rail-collapsed .nav-item,
+  .left-rail-collapsed .theme-toggle {
+    justify-content: center;
+  }
+
+  .left-rail-collapsed .rail-meta {
+    justify-items: center;
   }
 }

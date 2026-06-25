@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 type PayModel = 'hourly' | 'flat'
 type DeliverableType =
@@ -16,6 +16,16 @@ type ProjectStatus =
 type UrgencyState = 'on_track' | 'due_soon' | 'overdue'
 type NavSection = 'queue' | 'hours' | 'resources'
 type ThemeMode = 'dark' | 'light'
+type IconName =
+  | 'queue'
+  | 'hours'
+  | 'resources'
+  | 'chevron_left'
+  | 'chevron_right'
+  | 'sun'
+  | 'moon'
+  | 'alert'
+  | 'calendar'
 
 type Editor = {
   id: string
@@ -423,6 +433,123 @@ const RESOURCES = [
   },
 ]
 
+function Icon({ name, className }: { name: IconName; className?: string }) {
+  if (name === 'queue') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="5" width="16" height="3" rx="1.5" fill="currentColor" />
+        <rect x="4" y="10.5" width="16" height="3" rx="1.5" fill="currentColor" />
+        <rect x="4" y="16" width="16" height="3" rx="1.5" fill="currentColor" />
+      </svg>
+    )
+  }
+
+  if (name === 'hours') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M12 8v4.6l3 2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    )
+  }
+
+  if (name === 'resources') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M5.5 6.5a3 3 0 0 1 3-3H18v15h-9.5a3 3 0 1 0 0 6H18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path d="M5.5 6.5V21" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    )
+  }
+
+  if (name === 'chevron_left') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="m14.5 5.5-6 6.5 6 6.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+
+  if (name === 'chevron_right') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="m9.5 5.5 6 6.5-6 6.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+
+  if (name === 'sun') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path
+          d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.8 5.8 7.6 7.6M16.4 16.4l1.8 1.8M5.8 18.2l1.8-1.8M16.4 7.6l1.8-1.8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    )
+  }
+
+  if (name === 'moon') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M14.3 4.2a7.7 7.7 0 1 0 5.5 13.3 8.8 8.8 0 0 1-5.5-13.3Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+
+  if (name === 'alert') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 4.5 20 19H4L12 4.5Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path d="M12 9v4.6M12 16.6h.01" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="5.5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 3.7v3.5M16 3.7v3.5M3.5 10h17" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
 function runWithViewTransition(updateFn: () => void): void {
   if (typeof document === 'undefined') {
     updateFn()
@@ -510,6 +637,16 @@ function sectionTitle(section: NavSection): string {
   return 'Resources'
 }
 
+function sectionIcon(section: NavSection): IconName {
+  if (section === 'queue') {
+    return 'queue'
+  }
+  if (section === 'hours') {
+    return 'hours'
+  }
+  return 'resources'
+}
+
 function App() {
   const [editors] = useState(MOCK_EDITORS)
   const [clients] = useState(MOCK_CLIENTS)
@@ -532,6 +669,9 @@ function App() {
   const [logProjectId, setLogProjectId] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [toast, setToast] = useState<ToastState | null>(null)
+  const [recentlyChangedProjectId, setRecentlyChangedProjectId] = useState<string | null>(null)
+  const queueItemRefs = useRef<Record<string, HTMLLIElement | null>>({})
+  const queuePositionsRef = useRef<Map<string, number>>(new Map())
 
   const activeEditor = useMemo(
     () => editors.find((editor) => editor.id === activeEditorId) ?? editors[0],
@@ -666,8 +806,63 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    if (!recentlyChangedProjectId) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setRecentlyChangedProjectId((current) =>
+        current === recentlyChangedProjectId ? null : current,
+      )
+    }, 1100)
+    return () => window.clearTimeout(timer)
+  }, [recentlyChangedProjectId])
+
+  useLayoutEffect(() => {
+    if (queueProjects.length === 0) {
+      queuePositionsRef.current = new Map()
+      return
+    }
+
+    const nextPositions = new Map<string, number>()
+    for (const project of queueProjects) {
+      const node = queueItemRefs.current[project.id]
+      if (node) {
+        nextPositions.set(project.id, node.getBoundingClientRect().top)
+      }
+    }
+
+    for (const project of queueProjects) {
+      const node = queueItemRefs.current[project.id]
+      const previousTop = queuePositionsRef.current.get(project.id)
+      const currentTop = nextPositions.get(project.id)
+      if (!node || previousTop === undefined || currentTop === undefined) {
+        continue
+      }
+      const delta = previousTop - currentTop
+      if (Math.abs(delta) < 2) {
+        continue
+      }
+      node.style.transform = `translateY(${delta}px)`
+      node.style.transition = 'transform 0ms'
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          node.style.transform = 'translateY(0)'
+          node.style.transition = 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)'
+        })
+      })
+    }
+
+    queuePositionsRef.current = nextPositions
+  }, [queueProjects])
+
   const showToast = (message: string): void => {
     setToast({ id: Date.now(), message })
+  }
+
+  const markProjectUpdated = (projectId: string, message: string): void => {
+    setRecentlyChangedProjectId(projectId)
+    showToast(message)
   }
 
   function updateProject(projectId: string, updater: (project: Project) => Project): void {
@@ -682,7 +877,7 @@ function App() {
       status,
       approvedAt: status === 'approved' ? new Date().toISOString() : null,
     }))
-    showToast(`Status updated to ${STATUS_LABELS[status]}`)
+    markProjectUpdated(projectId, `Status updated to ${STATUS_LABELS[status]}`)
   }
 
   function submitForReview(): void {
@@ -710,7 +905,7 @@ function App() {
     })
 
     setDeliveryLinkDraft('')
-    showToast('Delivery submitted for review')
+    markProjectUpdated(selectedProject.id, 'Delivery submitted for review')
   }
 
   function requestRevision(): void {
@@ -741,7 +936,7 @@ function App() {
     }))
 
     setRevisionDraft('')
-    showToast('Revision notes added')
+    markProjectUpdated(selectedProject.id, 'Revision notes added')
   }
 
   function addComment(): void {
@@ -827,14 +1022,21 @@ function App() {
 
     return (
       <ul className="queue-list">
-        {queueProjects.map((project, index) => {
+        {queueProjects.map((project) => {
           const client = clientById[project.clientId]
           const urgency = projectUrgency(project.dueDate, project.status)
           return (
-            <li key={project.id} style={{ animationDelay: `${index * 32}ms` }}>
+            <li
+              key={project.id}
+              ref={(element) => {
+                queueItemRefs.current[project.id] = element
+              }}
+            >
               <button
                 type="button"
-                className={`queue-card ${project.id === selectedProjectId ? 'queue-card-active' : ''}`}
+                className={`queue-card ${
+                  project.id === selectedProjectId ? 'queue-card-active' : ''
+                } ${project.id === recentlyChangedProjectId ? 'queue-card-updated' : ''}`}
                 onClick={() => setSelectedProjectId(project.id)}
               >
                 <div className="queue-client-row">
@@ -1205,7 +1407,10 @@ function App() {
             onClick={() => setIsRailCollapsed((prev) => !prev)}
             aria-label={isRailCollapsed ? 'Expand navigation' : 'Collapse navigation'}
           >
-            {isRailCollapsed ? '»' : '«'}
+            <Icon
+              name={isRailCollapsed ? 'chevron_right' : 'chevron_left'}
+              className="icon icon-inline"
+            />
           </button>
         </div>
 
@@ -1215,21 +1420,24 @@ function App() {
             className={activeSection === 'queue' ? 'nav-item nav-item-active' : 'nav-item'}
             onClick={() => setActiveSection('queue')}
           >
-            <span>Queue</span>
+            <Icon name="queue" className="icon nav-icon" />
+            <span className="nav-label">Queue</span>
           </button>
           <button
             type="button"
             className={activeSection === 'hours' ? 'nav-item nav-item-active' : 'nav-item'}
             onClick={() => setActiveSection('hours')}
           >
-            <span>Hours</span>
+            <Icon name="hours" className="icon nav-icon" />
+            <span className="nav-label">Hours</span>
           </button>
           <button
             type="button"
             className={activeSection === 'resources' ? 'nav-item nav-item-active' : 'nav-item'}
             onClick={() => setActiveSection('resources')}
           >
-            <span>Resources</span>
+            <Icon name="resources" className="icon nav-icon" />
+            <span className="nav-label">Resources</span>
           </button>
         </nav>
 
@@ -1258,7 +1466,8 @@ function App() {
             className="theme-toggle"
             onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
           >
-            Theme: {themeMode === 'dark' ? 'Dark' : 'Light'}
+            <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} className="icon icon-inline" />
+            <span>Theme: {themeMode === 'dark' ? 'Dark' : 'Light'}</span>
           </button>
         </div>
       </aside>
@@ -1267,15 +1476,24 @@ function App() {
         <header className="main-header">
           <div>
             <p className="eyebrow">{activeEditor.name}</p>
-            <h2>{sectionTitle(activeSection)}</h2>
+            <div className="section-title">
+              <Icon name={sectionIcon(activeSection)} className="icon" />
+              <h2>{sectionTitle(activeSection)}</h2>
+            </div>
           </div>
           <div className="header-metrics">
             <div>
-              <p>Overdue</p>
+              <p>
+                <Icon name="alert" className="icon icon-inline" />
+                Overdue
+              </p>
               <strong className="tabular">{overdueCount}</strong>
             </div>
             <div>
-              <p>Now</p>
+              <p>
+                <Icon name="calendar" className="icon icon-inline" />
+                Now
+              </p>
               <strong className="tabular">{formatDate(new Date().toISOString(), activeEditor.timezone)}</strong>
             </div>
           </div>

@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 
-declare global {
-  interface Document {
-    startViewTransition?: (updateCallback: () => void) => { finished: Promise<void> }
-  }
-}
-
 type PayModel = 'hourly' | 'flat'
 type DeliverableType =
   | 'reel'

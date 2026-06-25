@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 
+declare global {
+  interface Document {
+    startViewTransition?: (updateCallback: () => void) => { finished: Promise<void> }
+  }
+}
+
 type PayModel = 'hourly' | 'flat'
 type DeliverableType =
   | 'reel'
@@ -14,6 +20,8 @@ type ProjectStatus =
   | 'revisions_requested'
   | 'approved'
 type UrgencyState = 'on_track' | 'due_soon' | 'overdue'
+type NavSection = 'queue' | 'hours' | 'resources'
+type ThemeMode = 'dark' | 'light'
 
 type Editor = {
   id: string
@@ -90,6 +98,11 @@ type PayPeriodSummary = {
   pay: number
 }
 
+type ToastState = {
+  id: number
+  message: string
+}
+
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   not_started: 'Not started',
   editing: 'Editing',
@@ -111,6 +124,14 @@ const URGENCY_LABELS: Record<UrgencyState, string> = {
   due_soon: 'Due soon',
   overdue: 'Overdue',
 }
+
+const STATUS_FLOW: ProjectStatus[] = [
+  'not_started',
+  'editing',
+  'submitted',
+  'revisions_requested',
+  'approved',
+]
 
 const MOCK_EDITORS: Editor[] = [
   {
@@ -140,10 +161,10 @@ const MOCK_EDITORS: Editor[] = [
 ]
 
 const MOCK_CLIENTS: Client[] = [
-  { id: 'c-yfl', name: 'Yorkdale Ford Lincoln', accentColor: '#6ea8ff' },
-  { id: 'c-land', name: 'Landscaping Legends', accentColor: '#7fdb8a' },
-  { id: 'c-mrg', name: 'MRG Group', accentColor: '#d9a3ff' },
-  { id: 'c-event', name: 'Event Coverage', accentColor: '#ffd18f' },
+  { id: 'c-yfl', name: 'Yorkdale Ford Lincoln', accentColor: '#7ca6f5' },
+  { id: 'c-land', name: 'Landscaping Legends', accentColor: '#8ac79a' },
+  { id: 'c-mrg', name: 'MRG Group', accentColor: '#c9a0e7' },
+  { id: 'c-event', name: 'Event Coverage', accentColor: '#d9b88e' },
 ]
 
 const MOCK_PROJECTS: Project[] = [
@@ -153,7 +174,7 @@ const MOCK_PROJECTS: Project[] = [
     title: 'Yorkdale 9:16 Summer Lease Reel',
     deliverableType: 'reel',
     brief:
-      'Fast paced social cut, 20-25s, bold text callouts, clean transitions. Prioritize SUVs and dealership team moments.',
+      'Fast-paced social cut, 20-25s, bold text callouts, clean transitions. Prioritize SUVs and dealership team moments.',
     specs: {
       aspectRatio: '9:16',
       resolution: '1080x1920',
@@ -392,21 +413,35 @@ const MOCK_TIME_ENTRIES: TimeEntry[] = [
 const RESOURCES = [
   {
     title: 'File naming',
-    body: 'Use project short code + deliverable + version number (v1, v2...) before final export.',
+    body: 'Use project short code + deliverable + version number before final exports.',
   },
   {
     title: 'Export presets',
-    body: 'Social masters: H.264 12-16 Mbps. Archive masters: ProRes 422 HQ with matching frame rate.',
+    body: 'Social: H.264 12-16 Mbps. Archive masters: ProRes 422 HQ with source frame rate.',
   },
   {
-    title: 'Brand graphics',
-    body: 'Keep lower-thirds inside safe margins and use approved typography scale from the latest kit.',
+    title: 'Brand graphics standards',
+    body: 'Keep lower-thirds inside safe margins and use approved type scale from the latest kit.',
   },
   {
     title: 'Style references',
-    body: 'Match pacing and transitions from approved showcase reels for each client before trying new treatments.',
+    body: 'Match pacing and transitions from approved examples before introducing new treatments.',
   },
 ]
+
+function runWithViewTransition(updateFn: () => void): void {
+  if (typeof document === 'undefined') {
+    updateFn()
+    return
+  }
+
+  if (document.startViewTransition) {
+    document.startViewTransition(updateFn)
+    return
+  }
+
+  updateFn()
+}
 
 function monthKey(isoDate: string, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -414,18 +449,19 @@ function monthKey(isoDate: string, timeZone: string): string {
     month: '2-digit',
     timeZone,
   }).formatToParts(new Date(isoDate))
+
   const year = parts.find((part) => part.type === 'year')?.value ?? '1970'
   const month = parts.find((part) => part.type === 'month')?.value ?? '01'
   return `${year}-${month}`
 }
 
 function monthLabel(periodKey: string, timeZone: string): string {
-  const labelDate = new Date(`${periodKey}-01T00:00:00Z`)
+  const date = new Date(`${periodKey}-01T00:00:00Z`)
   return new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
     timeZone,
-  }).format(labelDate)
+  }).format(date)
 }
 
 function formatDateTime(isoDate: string, timeZone: string): string {
@@ -434,6 +470,15 @@ function formatDateTime(isoDate: string, timeZone: string): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone,
+  }).format(new Date(isoDate))
+}
+
+function formatDate(isoDate: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
     timeZone,
   }).format(new Date(isoDate))
 }
@@ -461,27 +506,38 @@ function projectUrgency(dueDate: string, status: ProjectStatus): UrgencyState {
   return 'on_track'
 }
 
-function App() {
-  const [editors] = useState<Editor[]>(MOCK_EDITORS)
-  const [clients] = useState<Client[]>(MOCK_CLIENTS)
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS)
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(MOCK_TIME_ENTRIES)
+function sectionTitle(section: NavSection): string {
+  if (section === 'queue') {
+    return 'Queue'
+  }
+  if (section === 'hours') {
+    return 'Hours & pay'
+  }
+  return 'Resources'
+}
 
-  const [activeEditorId, setActiveEditorId] = useState(editors[0].id)
+function App() {
+  const [editors] = useState(MOCK_EDITORS)
+  const [clients] = useState(MOCK_CLIENTS)
+  const [projects, setProjects] = useState(MOCK_PROJECTS)
+  const [timeEntries, setTimeEntries] = useState(MOCK_TIME_ENTRIES)
+
+  const [activeEditorId, setActiveEditorId] = useState(MOCK_EDITORS[0].id)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [clientFilter, setClientFilter] = useState<'all' | string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | ProjectStatus>('all')
-  const [deliveryLinkDraft, setDeliveryLinkDraft] = useState('')
-  const [commentDraft, setCommentDraft] = useState('')
-  const [revisionDraft, setRevisionDraft] = useState('')
-  const [hoursDraft, setHoursDraft] = useState('1')
-  const [logProjectId, setLogProjectId] = useState<string>('')
-  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setIsLoading(false), 700)
-    return () => window.clearTimeout(timer)
-  }, [])
+  const [activeSection, setActiveSection] = useState<NavSection>('queue')
+  const [isRailCollapsed, setIsRailCollapsed] = useState(false)
+  const [themeMode, setThemeMode] = useState<ThemeMode>('dark')
+
+  const [deliveryLinkDraft, setDeliveryLinkDraft] = useState('')
+  const [revisionDraft, setRevisionDraft] = useState('')
+  const [commentDraft, setCommentDraft] = useState('')
+  const [hoursDraft, setHoursDraft] = useState('1')
+  const [logProjectId, setLogProjectId] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [toast, setToast] = useState<ToastState | null>(null)
 
   const activeEditor = useMemo(
     () => editors.find((editor) => editor.id === activeEditorId) ?? editors[0],
@@ -503,31 +559,10 @@ function App() {
       )
   }, [clientFilter, scopedProjects, statusFilter])
 
-  useEffect(() => {
-    if (queueProjects.length === 0) {
-      setSelectedProjectId(null)
-      return
-    }
-
-    const currentExists = queueProjects.some((project) => project.id === selectedProjectId)
-    if (!currentExists) {
-      setSelectedProjectId(queueProjects[0].id)
-    }
-  }, [queueProjects, selectedProjectId])
-
-  useEffect(() => {
-    if (queueProjects.length === 0) {
-      setLogProjectId('')
-      return
-    }
-    const exists = queueProjects.some((project) => project.id === logProjectId)
-    if (!exists) {
-      setLogProjectId(queueProjects[0].id)
-    }
-  }, [logProjectId, queueProjects])
-
-  const selectedProject =
-    scopedProjects.find((project) => project.id === selectedProjectId) ?? null
+  const selectedProject = useMemo(
+    () => scopedProjects.find((project) => project.id === selectedProjectId) ?? null,
+    [scopedProjects, selectedProjectId],
+  )
 
   const clientById = useMemo(
     () => Object.fromEntries(clients.map((client) => [client.id, client])) as Record<string, Client>,
@@ -535,7 +570,11 @@ function App() {
   )
 
   const projectById = useMemo(
-    () => Object.fromEntries(projects.map((project) => [project.id, project])) as Record<string, Project>,
+    () =>
+      Object.fromEntries(projects.map((project) => [project.id, project])) as Record<
+        string,
+        Project
+      >,
     [projects],
   )
 
@@ -586,14 +625,61 @@ function App() {
         pay: 0,
       }
 
-    const history = periodSummaries.filter((summary) => summary.periodKey !== currentPeriod)
-    return { currentSummary, history }
+    return {
+      currentSummary,
+      history: periodSummaries.filter((summary) => summary.periodKey !== currentPeriod),
+    }
   }, [activeEditor, scopedProjects, timeEntries])
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsLoading(false)
+    }, 850)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    if (queueProjects.length === 0) {
+      setSelectedProjectId(null)
+      return
+    }
+
+    const exists = queueProjects.some((project) => project.id === selectedProjectId)
+    if (!exists) {
+      setSelectedProjectId(queueProjects[0].id)
+    }
+  }, [queueProjects, selectedProjectId])
+
+  useEffect(() => {
+    if (queueProjects.length === 0) {
+      setLogProjectId('')
+      return
+    }
+
+    const exists = queueProjects.some((project) => project.id === logProjectId)
+    if (!exists) {
+      setLogProjectId(queueProjects[0].id)
+    }
+  }, [queueProjects, logProjectId])
+
+  useEffect(() => {
+    if (!toast) {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setToast((currentToast) => (currentToast?.id === toast.id ? null : currentToast))
+    }, 2200)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const showToast = (message: string): void => {
+    setToast({ id: Date.now(), message })
+  }
+
   function updateProject(projectId: string, updater: (project: Project) => Project): void {
-    setProjects((previous) =>
-      previous.map((project) => (project.id === projectId ? updater(project) : project)),
-    )
+    runWithViewTransition(() => {
+      setProjects((prev) => prev.map((project) => (project.id === projectId ? updater(project) : project)))
+    })
   }
 
   function setProjectStatus(projectId: string, status: ProjectStatus): void {
@@ -602,6 +688,7 @@ function App() {
       status,
       approvedAt: status === 'approved' ? new Date().toISOString() : null,
     }))
+    showToast(`Status updated to ${STATUS_LABELS[status]}`)
   }
 
   function submitForReview(): void {
@@ -610,23 +697,26 @@ function App() {
     }
 
     updateProject(selectedProject.id, (project) => {
-      const updatedRevisions = project.revisions.map((revision) => {
-        if (revision.resolvedAt === null) {
-          return { ...revision, resolvedAt: new Date().toISOString() }
-        }
-        return revision
-      })
+      const nextRevisions = project.revisions.map((revision) =>
+        revision.resolvedAt === null
+          ? {
+              ...revision,
+              resolvedAt: new Date().toISOString(),
+            }
+          : revision,
+      )
 
       return {
         ...project,
         status: 'submitted',
         deliveryLink: deliveryLinkDraft.trim(),
-        revisions: updatedRevisions,
+        revisions: nextRevisions,
         approvedAt: null,
       }
     })
 
     setDeliveryLinkDraft('')
+    showToast('Delivery submitted for review')
   }
 
   function requestRevision(): void {
@@ -639,7 +729,7 @@ function App() {
       .map((note) => note.trim())
       .filter(Boolean)
 
-    const safeNotes = notes.length > 0 ? notes : ['Please adjust pacing and tighten intro.']
+    const safeNotes = notes.length > 0 ? notes : ['Please tighten the pacing in opening sequence.']
 
     updateProject(selectedProject.id, (project) => ({
       ...project,
@@ -655,7 +745,9 @@ function App() {
       ],
       approvedAt: null,
     }))
+
     setRevisionDraft('')
+    showToast('Revision notes added')
   }
 
   function addComment(): void {
@@ -675,7 +767,9 @@ function App() {
         },
       ],
     }))
+
     setCommentDraft('')
+    showToast('Comment posted')
   }
 
   function logHours(): void {
@@ -683,339 +777,307 @@ function App() {
       return
     }
 
-    const parsed = Number(hoursDraft)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    const parsedHours = Number(hoursDraft)
+    if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
       return
     }
 
-    setTimeEntries((previous) => [
-      ...previous,
-      {
-        id: `te-${crypto.randomUUID()}`,
-        projectId: logProjectId,
-        editorId: activeEditor.id,
-        hours: parsed,
-        date: new Date().toISOString(),
-        rateApplied: activeEditor.hourlyRate ?? 0,
-      },
-    ])
+    runWithViewTransition(() => {
+      setTimeEntries((prev) => [
+        ...prev,
+        {
+          id: `te-${crypto.randomUUID()}`,
+          projectId: logProjectId,
+          editorId: activeEditor.id,
+          hours: parsedHours,
+          date: new Date().toISOString(),
+          rateApplied: activeEditor.hourlyRate ?? 0,
+        },
+      ])
+    })
+
     setHoursDraft('1')
+    showToast('Hours logged')
   }
 
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Contentout editor panel</p>
-          <h1>My Queue</h1>
-        </div>
-        <div className="editor-switcher">
-          <label htmlFor="editorSelect">Logged in as</label>
-          <select
-            id="editorSelect"
-            value={activeEditor.id}
-            onChange={(event) => {
-              setActiveEditorId(event.target.value)
-              setClientFilter('all')
-              setStatusFilter('all')
-            }}
-          >
-            {editors.map((editor) => (
-              <option key={editor.id} value={editor.id}>
-                {editor.name} ({editor.avatarInitials})
-              </option>
+  const overdueCount = queueProjects.filter(
+    (project) => projectUrgency(project.dueDate, project.status) === 'overdue',
+  ).length
+
+  const renderQueueContent = () => {
+    if (isLoading) {
+      return (
+        <>
+          <ul className="queue-list" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <li key={`queue-skeleton-${index}`} className="queue-card queue-card-skeleton">
+                <div className="skeleton-line width-40"></div>
+                <div className="skeleton-line width-75"></div>
+                <div className="skeleton-line width-55"></div>
+                <div className="skeleton-tags">
+                  <span className="skeleton-pill"></span>
+                  <span className="skeleton-pill"></span>
+                </div>
+              </li>
             ))}
-          </select>
-          <p className="timezone">{activeEditor.timezone}</p>
+          </ul>
+        </>
+      )
+    }
+
+    if (queueProjects.length === 0) {
+      return (
+        <p className="panel-empty">Nothing assigned yet - check back or message the team.</p>
+      )
+    }
+
+    return (
+      <ul className="queue-list">
+        {queueProjects.map((project, index) => {
+          const client = clientById[project.clientId]
+          const urgency = projectUrgency(project.dueDate, project.status)
+          return (
+            <li key={project.id} style={{ animationDelay: `${index * 32}ms` }}>
+              <button
+                type="button"
+                className={`queue-card ${project.id === selectedProjectId ? 'queue-card-active' : ''}`}
+                onClick={() => setSelectedProjectId(project.id)}
+              >
+                <div className="queue-client-row">
+                  <span
+                    className="client-dot"
+                    style={{ backgroundColor: client?.accentColor ?? '#999999' }}
+                    aria-hidden="true"
+                  ></span>
+                  <span>{client?.name ?? 'Unknown client'}</span>
+                </div>
+
+                <h3>{project.title}</h3>
+
+                <p className="muted tabular">{DELIVERABLE_LABELS[project.deliverableType]}</p>
+                <p className="muted tabular">
+                  Due {formatDateTime(project.dueDate, activeEditor.timezone)}
+                </p>
+
+                <div className="pill-row">
+                  <span className={`pill urgency-${urgency}`}>{URGENCY_LABELS[urgency]}</span>
+                  <span className={`pill status-${project.status}`}>{STATUS_LABELS[project.status]}</span>
+                  {project.status === 'revisions_requested' ? (
+                    <span className="pill status-revisions_requested">Round {project.revisions.length}</span>
+                  ) : null}
+                </div>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
+  const renderProjectDetail = () => {
+    if (isLoading) {
+      return (
+        <div className="detail-skeleton" aria-hidden="true">
+          <div className="skeleton-line width-45"></div>
+          <div className="skeleton-line width-85"></div>
+          <div className="skeleton-box"></div>
+          <div className="skeleton-box"></div>
+          <div className="skeleton-box"></div>
         </div>
-      </header>
+      )
+    }
 
-      <section className="layout-primary">
-        <article className="panel">
-          <div className="panel-header">
-            <h2>Queue</h2>
-            <p>Sorted by due date, scoped to your assignments only.</p>
+    if (!selectedProject) {
+      return <p className="panel-empty">Select a project from the queue to see full details.</p>
+    }
+
+    return (
+      <div className="project-detail">
+        <header className="project-header">
+          <div>
+            <p className="muted">{clientById[selectedProject.clientId]?.name ?? 'Client'}</p>
+            <h3>{selectedProject.title}</h3>
           </div>
+          <span className={`pill status-${selectedProject.status}`}>{STATUS_LABELS[selectedProject.status]}</span>
+        </header>
 
-          <div className="filters">
-            <label>
-              Client
-              <select
-                value={clientFilter}
-                onChange={(event) => setClientFilter(event.target.value)}
+        <section className="detail-section">
+          <h4>Brief</h4>
+          <p>{selectedProject.brief}</p>
+        </section>
+
+        <section className="detail-section">
+          <h4>Status workflow</h4>
+          <div className="status-flow" role="list" aria-label="Project status flow">
+            {STATUS_FLOW.map((status) => (
+              <button
+                key={status}
+                type="button"
+                role="listitem"
+                className={`flow-pill ${selectedProject.status === status ? 'flow-pill-active' : ''}`}
+                onClick={() => setProjectStatus(selectedProject.id, status)}
               >
-                <option value="all">All clients</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Status
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as 'all' | ProjectStatus)
-                }
-              >
-                <option value="all">All statuses</option>
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                {STATUS_LABELS[status]}
+              </button>
+            ))}
           </div>
+        </section>
 
-          {isLoading ? (
-            <p className="loading">Loading queue…</p>
-          ) : queueProjects.length === 0 ? (
-            <p className="empty">
-              Nothing assigned yet - check back or message the team.
-            </p>
-          ) : (
-            <ul className="queue-list">
-              {queueProjects.map((project) => {
-                const urgency = projectUrgency(project.dueDate, project.status)
-                const client = clientById[project.clientId]
-                return (
-                  <li key={project.id}>
-                    <button
-                      type="button"
-                      className={`queue-card ${
-                        project.id === selectedProjectId ? 'queue-card-active' : ''
-                      }`}
-                      onClick={() => setSelectedProjectId(project.id)}
-                    >
-                      <div className="queue-card-header">
-                        <span
-                          className="client-dot"
-                          style={{ backgroundColor: client.accentColor }}
-                          aria-hidden="true"
-                        ></span>
-                        <p>{client.name}</p>
-                      </div>
-                      <h3>{project.title}</h3>
-                      <p className="meta-row">{DELIVERABLE_LABELS[project.deliverableType]}</p>
-                      <p className="meta-row">
-                        Due {formatDateTime(project.dueDate, activeEditor.timezone)}
-                      </p>
-                      <div className="pill-row">
-                        <span className={`pill urgency-${urgency}`}>
-                          {URGENCY_LABELS[urgency]}
-                        </span>
-                        <span className={`pill status-${project.status}`}>
-                          {STATUS_LABELS[project.status]}
-                        </span>
-                        {project.status === 'revisions_requested' ? (
-                          <span className="pill badge">New notes</span>
-                        ) : null}
-                      </div>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </article>
+        <section className="detail-section">
+          <h4>Deliverable specs</h4>
+          <ul className="spec-grid">
+            <li>
+              <span>Aspect ratio</span>
+              <strong className="tabular">{selectedProject.specs.aspectRatio}</strong>
+            </li>
+            <li>
+              <span>Resolution</span>
+              <strong className="tabular">{selectedProject.specs.resolution}</strong>
+            </li>
+            <li>
+              <span>Bitrate</span>
+              <strong className="tabular">{selectedProject.specs.bitrate}</strong>
+            </li>
+            <li>
+              <span>File naming</span>
+              <strong className="tabular">{selectedProject.specs.fileNaming}</strong>
+            </li>
+          </ul>
+        </section>
 
-        <article className="panel">
-          <div className="panel-header">
-            <h2>Project detail</h2>
-            <p>Brief, assets, revisions, comments, and delivery in one place.</p>
+        <section className="detail-section">
+          <h4>Assets</h4>
+          <ul className="link-list">
+            {selectedProject.assetLinks.map((asset) => (
+              <li key={asset.url}>
+                <a href={asset.url} target="_blank" rel="noreferrer">
+                  {asset.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="detail-section">
+          <h4>Delivery</h4>
+          <div className="input-row">
+            <input
+              type="url"
+              value={deliveryLinkDraft}
+              onChange={(event) => setDeliveryLinkDraft(event.target.value)}
+              placeholder="Paste final file or Frame.io link"
+              aria-label="Delivery link"
+            />
+            <button
+              type="button"
+              onClick={submitForReview}
+              disabled={deliveryLinkDraft.trim().length === 0}
+            >
+              Submit for review
+            </button>
           </div>
+        </section>
 
-          {isLoading ? (
-            <p className="loading">Loading project…</p>
-          ) : !selectedProject ? (
-            <p className="empty">Select a project from your queue to start working.</p>
+        <section className="detail-section">
+          <h4>Revision history</h4>
+          {selectedProject.revisions.length === 0 ? (
+            <p className="muted">No revision rounds yet.</p>
           ) : (
-            <div className="project-detail">
-              <div className="project-title-row">
-                <div>
-                  <p className="project-client">{clientById[selectedProject.clientId].name}</p>
-                  <h3>{selectedProject.title}</h3>
-                </div>
-                <span className={`pill status-${selectedProject.status}`}>
-                  {STATUS_LABELS[selectedProject.status]}
-                </span>
-              </div>
-
-              <section>
-                <h4>Brief</h4>
-                <p>{selectedProject.brief}</p>
-              </section>
-
-              <section>
-                <h4>Deliverable specs</h4>
-                <ul className="spec-grid">
-                  <li>
-                    <span>Aspect ratio</span>
-                    <strong>{selectedProject.specs.aspectRatio}</strong>
-                  </li>
-                  <li>
-                    <span>Resolution</span>
-                    <strong>{selectedProject.specs.resolution}</strong>
-                  </li>
-                  <li>
-                    <span>Bitrate</span>
-                    <strong>{selectedProject.specs.bitrate}</strong>
-                  </li>
-                  <li>
-                    <span>File naming</span>
-                    <strong>{selectedProject.specs.fileNaming}</strong>
-                  </li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>Assets</h4>
-                <ul className="link-list">
-                  {selectedProject.assetLinks.map((asset) => (
-                    <li key={asset.url}>
-                      <a href={asset.url} target="_blank" rel="noreferrer">
-                        {asset.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section>
-                <h4>Workflow</h4>
-                <div className="action-row">
-                  <button
-                    type="button"
-                    onClick={() => setProjectStatus(selectedProject.id, 'not_started')}
-                  >
-                    Mark not started
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProjectStatus(selectedProject.id, 'editing')}
-                  >
-                    Start editing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProjectStatus(selectedProject.id, 'approved')}
-                  >
-                    Mark approved
-                  </button>
-                </div>
-                <div className="delivery-form">
-                  <input
-                    value={deliveryLinkDraft}
-                    onChange={(event) => setDeliveryLinkDraft(event.target.value)}
-                    placeholder="Paste final file or Frame.io link"
-                    aria-label="Delivery link"
-                  />
-                  <button
-                    type="button"
-                    onClick={submitForReview}
-                    disabled={deliveryLinkDraft.trim().length === 0}
-                  >
-                    Submit for review
-                  </button>
-                </div>
-                <div className="revision-form">
-                  <textarea
-                    value={revisionDraft}
-                    onChange={(event) => setRevisionDraft(event.target.value)}
-                    placeholder="Line-break separated revision notes"
-                    aria-label="Revision notes"
-                    rows={3}
-                  />
-                  <button type="button" onClick={requestRevision}>
-                    Add revision request
-                  </button>
-                </div>
-              </section>
-
-              <section>
-                <h4>Revision history</h4>
-                {selectedProject.revisions.length === 0 ? (
-                  <p className="empty-inline">No revision rounds yet.</p>
-                ) : (
-                  <ol className="revision-list">
-                    {selectedProject.revisions.map((revision) => (
-                      <li key={revision.round}>
-                        <p className="revision-heading">
-                          Round {revision.round} - requested{' '}
-                          {formatDateTime(revision.requestedAt, activeEditor.timezone)}
-                        </p>
-                        <ul>
-                          {revision.notes.map((note) => (
-                            <li key={`${revision.round}-${note}`}>{note}</li>
-                          ))}
-                        </ul>
-                        <p className="revision-state">
-                          {revision.resolvedAt
-                            ? `Resolved ${formatDateTime(
-                                revision.resolvedAt,
-                                activeEditor.timezone,
-                              )}`
-                            : 'Awaiting redelivery'}
-                        </p>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
-
-              <section>
-                <h4>Comments</h4>
-                {selectedProject.comments.length === 0 ? (
-                  <p className="empty-inline">No comments yet.</p>
-                ) : (
-                  <ul className="comment-list">
-                    {selectedProject.comments.map((comment) => (
-                      <li key={comment.id}>
-                        <p className="comment-meta">
-                          {comment.authorName} -{' '}
-                          {formatDateTime(comment.createdAt, activeEditor.timezone)}
-                        </p>
-                        <p>{comment.body}</p>
-                      </li>
+            <ol className="revision-list">
+              {selectedProject.revisions.map((revision) => (
+                <li key={revision.round}>
+                  <p className="tabular muted">
+                    Round {revision.round} - requested{' '}
+                    {formatDateTime(revision.requestedAt, activeEditor.timezone)}
+                  </p>
+                  <ul>
+                    {revision.notes.map((note) => (
+                      <li key={`${revision.round}-${note}`}>{note}</li>
                     ))}
                   </ul>
-                )}
-                <div className="comment-form">
-                  <textarea
-                    value={commentDraft}
-                    onChange={(event) => setCommentDraft(event.target.value)}
-                    placeholder="Add a project comment"
-                    aria-label="Project comment"
-                    rows={2}
-                  />
-                  <button type="button" onClick={addComment}>
-                    Post comment
-                  </button>
-                </div>
-              </section>
-            </div>
+                  <p className="tabular muted">
+                    {revision.resolvedAt
+                      ? `Resolved ${formatDateTime(revision.resolvedAt, activeEditor.timezone)}`
+                      : 'Awaiting redelivery'}
+                  </p>
+                </li>
+              ))}
+            </ol>
           )}
-        </article>
-      </section>
 
-      <section className="layout-secondary">
-        <article className="panel">
-          <div className="panel-header">
-            <h2>Hours & pay</h2>
-            <p>Monthly payout view with historical periods.</p>
+          <div className="input-stack">
+            <textarea
+              value={revisionDraft}
+              onChange={(event) => setRevisionDraft(event.target.value)}
+              placeholder="Add revision notes (one note per line)"
+              rows={3}
+            ></textarea>
+            <button type="button" onClick={requestRevision}>
+              Add revision request
+            </button>
           </div>
+        </section>
+
+        <section className="detail-section">
+          <h4>Comments</h4>
+          {selectedProject.comments.length === 0 ? (
+            <p className="muted">No comments yet.</p>
+          ) : (
+            <ul className="comment-list">
+              {selectedProject.comments.map((comment) => (
+                <li key={comment.id}>
+                  <p className="tabular muted">
+                    {comment.authorName} - {formatDateTime(comment.createdAt, activeEditor.timezone)}
+                  </p>
+                  <p>{comment.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="input-stack">
+            <textarea
+              value={commentDraft}
+              onChange={(event) => setCommentDraft(event.target.value)}
+              placeholder="Add comment"
+              rows={2}
+            ></textarea>
+            <button type="button" onClick={addComment} disabled={commentDraft.trim().length === 0}>
+              Post comment
+            </button>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  const renderHoursSection = () => {
+    if (isLoading) {
+      return (
+        <div className="hours-skeleton" aria-hidden="true">
+          <div className="skeleton-box"></div>
+          <div className="skeleton-box"></div>
+          <div className="skeleton-box"></div>
+        </div>
+      )
+    }
+
+    return (
+      <section className="content-grid-single">
+        <article className="surface-card">
+          <header className="surface-head">
+            <h2>Hours & pay</h2>
+            <p className="muted">Monthly totals aligned to studio payout cadence.</p>
+          </header>
 
           <div className="totals-grid">
             <div className="total-card">
               <p>Current period</p>
-              <h3>{monthLabel(paySummary.currentSummary.periodKey, activeEditor.timezone)}</h3>
+              <strong>{monthLabel(paySummary.currentSummary.periodKey, activeEditor.timezone)}</strong>
             </div>
             <div className="total-card">
               <p>Logged hours</p>
-              <h3>{paySummary.currentSummary.hours.toFixed(2)}</h3>
+              <strong className="tabular">{paySummary.currentSummary.hours.toFixed(2)}</strong>
             </div>
             <div className="total-card">
               <p>
@@ -1023,25 +1085,22 @@ function App() {
                   ? `Rate ${formatCurrency(activeEditor.hourlyRate ?? 0)}/hr`
                   : 'Approved deliverables'}
               </p>
-              <h3>
+              <strong className="tabular">
                 {activeEditor.payModel === 'hourly'
                   ? formatCurrency(paySummary.currentSummary.pay)
                   : paySummary.currentSummary.approvedDeliverables}
-              </h3>
+              </strong>
             </div>
             <div className="total-card">
               <p>Current payout</p>
-              <h3>{formatCurrency(paySummary.currentSummary.pay)}</h3>
+              <strong className="tabular">{formatCurrency(paySummary.currentSummary.pay)}</strong>
             </div>
           </div>
 
           <div className="hours-form">
             <label>
               Project
-              <select
-                value={logProjectId}
-                onChange={(event) => setLogProjectId(event.target.value)}
-              >
+              <select value={logProjectId} onChange={(event) => setLogProjectId(event.target.value)}>
                 {scopedProjects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.title}
@@ -1065,41 +1124,66 @@ function App() {
           </div>
 
           {paySummary.history.length === 0 ? (
-            <p className="empty-inline">No historical periods yet.</p>
+            <p className="muted">No historical periods yet.</p>
           ) : (
             <ul className="history-list">
-              {paySummary.history.map((period) => (
-                <li key={period.periodKey}>
-                  <p>{monthLabel(period.periodKey, activeEditor.timezone)}</p>
-                  <p>{period.hours.toFixed(2)} hrs</p>
-                  <p>{formatCurrency(period.pay)}</p>
+              {paySummary.history.map((summary) => (
+                <li key={summary.periodKey}>
+                  <p>{monthLabel(summary.periodKey, activeEditor.timezone)}</p>
+                  <p className="tabular">{summary.hours.toFixed(2)} hrs</p>
+                  <p className="tabular">{formatCurrency(summary.pay)}</p>
                 </li>
               ))}
             </ul>
           )}
+        </article>
 
-          <ul className="timeentry-list">
+        <article className="surface-card">
+          <header className="surface-head">
+            <h2>Recent time entries</h2>
+            <p className="muted">Latest logged activity in your local timezone.</p>
+          </header>
+
+          <ul className="time-entry-list">
             {timeEntries
               .filter((entry) => entry.editorId === activeEditor.id)
-              .slice()
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 5)
+              .sort((entryA, entryB) => new Date(entryB.date).getTime() - new Date(entryA.date).getTime())
+              .slice(0, 8)
               .map((entry) => (
                 <li key={entry.id}>
                   <p>{projectById[entry.projectId]?.title ?? 'Unknown project'}</p>
-                  <p>
-                    {entry.hours} hrs - {formatDateTime(entry.date, activeEditor.timezone)}
+                  <p className="tabular muted">
+                    {entry.hours.toFixed(2)} hrs - {formatDateTime(entry.date, activeEditor.timezone)}
                   </p>
                 </li>
               ))}
           </ul>
         </article>
+      </section>
+    )
+  }
 
-        <article className="panel">
-          <div className="panel-header">
-            <h2>Resources & standards</h2>
-            <p>Reference guidance for exports, naming, and style consistency.</p>
+  const renderResourcesSection = () => {
+    if (isLoading) {
+      return (
+        <div className="content-grid-single" aria-hidden="true">
+          <div className="surface-card">
+            <div className="skeleton-box"></div>
+            <div className="skeleton-box"></div>
+            <div className="skeleton-box"></div>
           </div>
+        </div>
+      )
+    }
+
+    return (
+      <section className="content-grid-single">
+        <article className="surface-card">
+          <header className="surface-head">
+            <h2>Resources & standards</h2>
+            <p className="muted">Fast references for exports, naming, graphics, and style consistency.</p>
+          </header>
+
           <ul className="resource-list">
             {RESOURCES.map((resource) => (
               <li key={resource.title}>
@@ -1110,6 +1194,152 @@ function App() {
           </ul>
         </article>
       </section>
+    )
+  }
+
+  return (
+    <div className="workspace-shell" data-theme={themeMode}>
+      <aside className={`left-rail ${isRailCollapsed ? 'left-rail-collapsed' : ''}`}>
+        <div className="rail-top">
+          <div className="brand-lockup">
+            <p>Contentout</p>
+            <h1>Editor panel</h1>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setIsRailCollapsed((prev) => !prev)}
+            aria-label={isRailCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            {isRailCollapsed ? '»' : '«'}
+          </button>
+        </div>
+
+        <nav className="rail-nav" aria-label="Primary navigation">
+          <button
+            type="button"
+            className={activeSection === 'queue' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setActiveSection('queue')}
+          >
+            <span>Queue</span>
+          </button>
+          <button
+            type="button"
+            className={activeSection === 'hours' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setActiveSection('hours')}
+          >
+            <span>Hours</span>
+          </button>
+          <button
+            type="button"
+            className={activeSection === 'resources' ? 'nav-item nav-item-active' : 'nav-item'}
+            onClick={() => setActiveSection('resources')}
+          >
+            <span>Resources</span>
+          </button>
+        </nav>
+
+        <div className="rail-meta">
+          <label htmlFor="editor-select">Logged in as</label>
+          <select
+            id="editor-select"
+            value={activeEditor.id}
+            onChange={(event) => {
+              setActiveEditorId(event.target.value)
+              setClientFilter('all')
+              setStatusFilter('all')
+              setActiveSection('queue')
+            }}
+          >
+            {editors.map((editor) => (
+              <option key={editor.id} value={editor.id}>
+                {editor.name}
+              </option>
+            ))}
+          </select>
+          <p className="muted tabular">{activeEditor.timezone}</p>
+
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          >
+            Theme: {themeMode === 'dark' ? 'Dark' : 'Light'}
+          </button>
+        </div>
+      </aside>
+
+      <main className="main-area">
+        <header className="main-header">
+          <div>
+            <p className="eyebrow">{activeEditor.name}</p>
+            <h2>{sectionTitle(activeSection)}</h2>
+          </div>
+          <div className="header-metrics">
+            <div>
+              <p>Overdue</p>
+              <strong className="tabular">{overdueCount}</strong>
+            </div>
+            <div>
+              <p>Now</p>
+              <strong className="tabular">{formatDate(new Date().toISOString(), activeEditor.timezone)}</strong>
+            </div>
+          </div>
+        </header>
+
+        {activeSection === 'queue' ? (
+          <section className="content-grid-two">
+            <article className="surface-card">
+              <header className="surface-head">
+                <h2>My queue</h2>
+                <p className="muted">Deadline-sorted and scoped to your assignments only.</p>
+              </header>
+
+              <div className="filters-row">
+                <label>
+                  Client
+                  <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+                    <option value="all">All clients</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Status
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as 'all' | ProjectStatus)}
+                  >
+                    <option value="all">All statuses</option>
+                    {Object.entries(STATUS_LABELS).map(([status, label]) => (
+                      <option key={status} value={status}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {renderQueueContent()}
+            </article>
+
+            <article className="surface-card">{renderProjectDetail()}</article>
+          </section>
+        ) : null}
+
+        {activeSection === 'hours' ? renderHoursSection() : null}
+        {activeSection === 'resources' ? renderResourcesSection() : null}
+      </main>
+
+      {toast ? (
+        <div className="toast" role="status" aria-live="polite">
+          {toast.message}
+        </div>
+      ) : null}
     </div>
   )
 }

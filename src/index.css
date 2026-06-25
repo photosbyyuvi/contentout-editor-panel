@@ -2291,3 +2291,73 @@ kbd {
     opacity: 1;
   }
 }
+
+/* Modal (New project) */
+.modal {
+  width: 560px;
+  max-width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  animation: overlay-in var(--t-base) var(--ease-in);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-16) var(--s-20);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.modal-head h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-16);
+  padding: var(--s-20);
+}
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-16);
+}
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-8);
+  padding: var(--s-16) var(--s-20);
+  border-top: 1px solid var(--border-subtle);
+}
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-8);
+}
+
+.invite-link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  margin-top: var(--s-12);
+}
+.invite-link-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.invite-link input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+}

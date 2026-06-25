@@ -13,6 +13,15 @@ import type {
 
 export type Toast = { id: number; message: string }
 
+export type NewProjectInput = {
+  title: string
+  clientId: string
+  deliverableType: string
+  assignedEditorId: string | null
+  dueDate: string
+  brief: string
+}
+
 export type AppContextValue = {
   users: User[]
   clients: Client[]
@@ -41,9 +50,12 @@ export type AppContextValue = {
   requestChanges: (projectId: string, notes: string[]) => void
   updateProject: (projectId: string, patch: Partial<Project>) => void
   updateUser: (userId: string, patch: Partial<User>) => void
-  inviteUser: (fullName: string, email: string, role: Role) => void
+  inviteUser: (fullName: string, email: string, role: Role) => Promise<string | null>
   changeRole: (userId: string, role: Role) => void
   setUserStatus: (userId: string, status: User['status']) => void
+  createClient: (name: string) => Promise<Client>
+  createProject: (data: NewProjectInput) => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
   updateNotificationPrefs: (prefs: NotificationPrefs) => void

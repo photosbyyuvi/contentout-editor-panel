@@ -12,9 +12,12 @@ import {
 import { formatHours } from './format'
 import { defaultNotificationPrefs } from './types'
 import { AppContext, type AppContextValue, type Toast } from './appContext'
+import type { NewProjectInput } from './appContext'
 import type {
   ActivityLog,
   AppNotification,
+  Client,
+  DeliverableType,
   Delivery,
   NotificationChannel,
   NotificationType,
@@ -31,6 +34,7 @@ const uid = (prefix: string) => `${prefix}-${++counter}-${Date.now().toString(36
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(USERS)
+  const [clients, setClients] = useState<Client[]>(CLIENTS)
   const [projects, setProjects] = useState<Project[]>(PROJECTS)
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(TIME_ENTRIES)
   const [notifications, setNotifications] = useState<AppNotification[]>(NOTIFICATIONS)
@@ -342,7 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...patch } : u)))
   }, [])
 
-  const inviteUser = useCallback((fullName: string, email: string, role: Role) => {
+  const inviteUser = useCallback(async (fullName: string, email: string, role: Role): Promise<string | null> => {
     const initials = fullName
       .split(/\s+/)
       .slice(0, 2)
@@ -365,6 +369,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
       notificationPrefs: defaultNotificationPrefs(),
     }
     setUsers((prev) => [...prev, newUser])
+    return null
+  }, [])
+
+  const createClient = useCallback(async (name: string): Promise<Client> => {
+    const palette = ['#3B82F6', '#22C55E', '#A855F7', '#F5A623', '#EC4899', '#14B8A6']
+    const client: Client = { id: uid('c'), name: name.trim(), accentColor: palette[Math.floor(Math.random() * palette.length)] }
+    setClients((prev) => [...prev, client])
+    return client
+  }, [])
+
+  const createProject = useCallback(
+    async (data: NewProjectInput) => {
+      if (!actingUser) {
+        return
+      }
+      const project: Project = {
+        id: uid('p'),
+        clientId: data.clientId,
+        title: data.title.trim(),
+        deliverableType: (data.deliverableType as DeliverableType) || 'reel',
+        brief: data.brief.trim(),
+        specs: { aspectRatio: '9:16', resolution: '1080x1920', bitrate: '12 Mbps H.264', fileNaming: `${data.title.replace(/\s+/g, '_')}_v{n}.mp4` },
+        assetLinks: [],
+        status: 'not_started',
+        dueDate: data.dueDate || new Date(Date.now() + 7 * 86400000).toISOString(),
+        assignedEditorId: data.assignedEditorId,
+        createdByUserId: actingUser.id,
+        revisions: [],
+        comments: [],
+        deliveries: [],
+        deliveryLink: null,
+        approvedAt: null,
+      }
+      setProjects((prev) => [...prev, project])
+      if (project.assignedEditorId) {
+        deliverNotification(project.assignedEditorId, 'assignment', project.id, `New project assigned: ${project.title}`)
+      }
+    },
+    [actingUser, deliverNotification],
+  )
+
+  const changePassword = useCallback(async () => {
+    throw new Error('Password changes are available in the official (backend) build.')
   }, [])
 
   const changeRole = useCallback((userId: string, role: Role) => {
@@ -417,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppContextValue>(
     () => ({
       users,
-      clients: CLIENTS,
+      clients,
       projects,
       timeEntries,
       activityLog,
@@ -446,12 +493,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       inviteUser,
       changeRole,
       setUserStatus,
+      createClient,
+      createProject,
+      changePassword,
       markNotificationRead,
       markAllNotificationsRead,
       updateNotificationPrefs,
     }),
     [
       users,
+      clients,
       projects,
       timeEntries,
       activityLog,
@@ -477,6 +528,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       requestChanges,
       updateProject,
       updateUser,
+      createClient,
+      createProject,
+      changePassword,
       inviteUser,
       changeRole,
       setUserStatus,

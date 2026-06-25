@@ -210,9 +210,32 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       updateProject: (projectId, patch) =>
         void projectAction(() => api.patchProject(projectId, { title: patch.title, brief: patch.brief })),
       updateUser: (userId, patch) => void run(() => api.updateUser(userId, patch)),
-      inviteUser: (fullName, email, role) => void run(() => api.invite(fullName, email, role)),
+      inviteUser: async (fullName, email, role) => {
+        try {
+          const { inviteUrl } = await api.invite(fullName, email, role)
+          await refresh()
+          return inviteUrl
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : 'Couldn\'t invite — try again')
+          return null
+        }
+      },
       changeRole: (userId, role: Role) => void run(() => api.setRole(userId, role)),
       setUserStatus: (userId, status) => void run(() => api.setStatus(userId, status)),
+      createClient: async (name) => {
+        const { client } = await api.createClient(name)
+        await refresh()
+        return client
+      },
+      createProject: async (data) => {
+        const { project } = await api.createProject(data)
+        setProjects((prev) => [...prev, project])
+        showToast('Project created')
+        void refresh()
+      },
+      changePassword: async (currentPassword, newPassword) => {
+        await api.changePassword(currentPassword, newPassword)
+      },
       markNotificationRead: (id) => {
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)))
         void api.markRead(id).catch(() => undefined)

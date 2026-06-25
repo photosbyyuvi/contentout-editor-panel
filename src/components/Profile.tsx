@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { isOwner } from '../permissions'
 import { PageHeader } from './PageHeader'
 import { formatCurrency } from '../format'
+import { USE_BACKEND } from '../config'
 import {
   DELIVERABLE_LABELS,
   NOTIFICATION_CHANNELS,
@@ -34,7 +35,22 @@ const CHANNEL_LABELS: Record<NotificationChannel, string> = {
 }
 
 export function Profile() {
-  const { user, updateUser, updateNotificationPrefs, showToast } = useApp()
+  const { user, updateUser, updateNotificationPrefs, changePassword, showToast } = useApp()
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [pwError, setPwError] = useState<string | null>(null)
+
+  const onChangePassword = async () => {
+    setPwError(null)
+    try {
+      await changePassword(currentPw, newPw)
+      setCurrentPw('')
+      setNewPw('')
+      showToast('Password updated')
+    } catch (caught) {
+      setPwError(caught instanceof Error ? caught.message : 'Could not change password.')
+    }
+  }
   const [fullName, setFullName] = useState(user?.fullName ?? '')
   const [initials, setInitials] = useState(user?.avatarInitials ?? '')
   const [timezone, setTimezone] = useState(user?.timezone ?? 'America/Toronto')
@@ -157,6 +173,26 @@ export function Profile() {
           Save changes
         </button>
       </section>
+
+      {USE_BACKEND ? (
+        <section className="surface">
+          <h2 className="section-head">Change password</h2>
+          <div className="profile-fields">
+            <label className="field">
+              <span>Current password</span>
+              <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} autoComplete="current-password" />
+            </label>
+            <label className="field">
+              <span>New password (min 8 chars)</span>
+              <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password" />
+            </label>
+          </div>
+          {pwError ? <p className="error" role="alert">{pwError}</p> : null}
+          <button type="button" className="primary-button profile-save" onClick={onChangePassword} disabled={!currentPw || !newPw}>
+            Update password
+          </button>
+        </section>
+      ) : null}
     </>
   )
 }

@@ -7,6 +7,7 @@ import { USE_BACKEND } from './config'
 import { isManager } from './permissions'
 import { Layout } from './components/Layout'
 import { Login } from './components/Login'
+import { ClaimInvite } from './components/ClaimInvite'
 import { Queue } from './components/Queue'
 import { ProjectDetail } from './components/ProjectDetail'
 import { Hours } from './components/Hours'
@@ -53,6 +54,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<RoleHome />} />
+      <Route path="/claim" element={<ClaimInvite />} />
       <Route
         element={
           <RequireAuth>

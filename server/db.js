@@ -48,6 +48,11 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 `)
 
+// Production bootstrap controls:
+//   SEED_DEMO=false        → seed only clients + the owner (clean instance)
+//   OWNER_EMAIL / OWNER_PASSWORD / OWNER_NAME → the real owner account
+const SEED_DEMO = process.env.SEED_DEMO !== 'false'
+
 function seedIfEmpty() {
   const seeded = db.prepare('SELECT value FROM meta WHERE key = ?').get('seeded')
   if (seeded) {
@@ -65,11 +70,27 @@ function seedIfEmpty() {
     VALUES (@id,@recipientUserId,@type,@projectId,@body,@createdAt,@readAt,@channelsSent)`)
   const insertActivity = db.prepare('INSERT INTO activity_log (id, actorUserId, action, targetType, targetId, createdAt) VALUES (@id,@actorUserId,@action,@targetType,@targetId,@createdAt)')
 
+  const ownerEmail = process.env.OWNER_EMAIL
+  const ownerPassword = process.env.OWNER_PASSWORD
+  const ownerName = process.env.OWNER_NAME || 'Owner'
+  const usersToSeed = SEED_DEMO
+    ? USERS.map((u) =>
+        ownerEmail && u.role === 'owner'
+          ? { ...u, email: ownerEmail, fullName: ownerName }
+          : u,
+      )
+    : [
+        ownerEmail
+          ? { ...USERS[0], email: ownerEmail, fullName: ownerName, avatarInitials: ownerName.slice(0, 2).toUpperCase() }
+          : USERS[0],
+      ]
+
   const tx = db.transaction(() => {
-    for (const u of USERS) {
+    for (const u of usersToSeed) {
+      const password = ownerEmail && u.role === 'owner' && ownerPassword ? ownerPassword : MOCK_PASSWORD
       insertUser.run({
         ...u,
-        passwordHash: bcrypt.hashSync(MOCK_PASSWORD, 10),
+        passwordHash: bcrypt.hashSync(password, 10),
         flatRates: u.flatRates ? JSON.stringify(u.flatRates) : null,
         notificationPrefs: JSON.stringify(defaultNotificationPrefs()),
       })
@@ -77,7 +98,7 @@ function seedIfEmpty() {
     for (const c of CLIENTS) {
       insertClient.run(c)
     }
-    for (const p of PROJECTS) {
+    for (const p of SEED_DEMO ? PROJECTS : []) {
       insertProject.run({
         id: p.id, clientId: p.clientId, title: p.title, deliverableType: p.deliverableType,
         assignedEditorId: p.assignedEditorId, createdByUserId: p.createdByUserId, status: p.status,
@@ -87,13 +108,13 @@ function seedIfEmpty() {
         comments: JSON.stringify(p.comments),
       })
     }
-    for (const t of TIME_ENTRIES) {
+    for (const t of SEED_DEMO ? TIME_ENTRIES : []) {
       insertTime.run(t)
     }
-    for (const n of NOTIFICATIONS) {
+    for (const n of SEED_DEMO ? NOTIFICATIONS : []) {
       insertNotif.run({ ...n, channelsSent: JSON.stringify(n.channelsSent) })
     }
-    for (const a of ACTIVITY_LOG) {
+    for (const a of SEED_DEMO ? ACTIVITY_LOG : []) {
       insertActivity.run(a)
     }
     db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run('seeded', new Date().toISOString())
@@ -180,6 +201,19 @@ export const repo = {
     return repo.getUser(id)
   },
   touchActive: (id) => db.prepare('UPDATE users SET lastActiveAt = ? WHERE id = ?').run(new Date().toISOString(), id),
+  setPassword: (id, passwordHash) => db.prepare('UPDATE users SET passwordHash = ?, status = CASE WHEN status = ? THEN ? ELSE status END WHERE id = ?').run(passwordHash, 'invited', 'active', id),
+  addClient: (client) => { db.prepare('INSERT INTO clients (id, name, accentColor) VALUES (@id,@name,@accentColor)').run(client); return client },
+  addProject: (p) => {
+    db.prepare(`INSERT INTO projects (id, clientId, title, deliverableType, assignedEditorId, createdByUserId, status, dueDate, deliveryLink, approvedAt, brief, specs, assetLinks, deliveries, revisions, comments)
+      VALUES (@id,@clientId,@title,@deliverableType,@assignedEditorId,@createdByUserId,@status,@dueDate,@deliveryLink,@approvedAt,@brief,@specs,@assetLinks,@deliveries,@revisions,@comments)`).run({
+      id: p.id, clientId: p.clientId, title: p.title, deliverableType: p.deliverableType,
+      assignedEditorId: p.assignedEditorId, createdByUserId: p.createdByUserId, status: p.status,
+      dueDate: p.dueDate, deliveryLink: p.deliveryLink, approvedAt: p.approvedAt, brief: p.brief,
+      specs: JSON.stringify(p.specs), assetLinks: JSON.stringify(p.assetLinks),
+      deliveries: JSON.stringify(p.deliveries), revisions: JSON.stringify(p.revisions), comments: JSON.stringify(p.comments),
+    })
+    return repo.getProject(p.id)
+  },
 }
 
 export { defaultNotificationPrefs }

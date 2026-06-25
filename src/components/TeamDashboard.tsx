@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye } from 'lucide-react'
+import { Eye, Plus } from 'lucide-react'
 import { useApp } from '../store'
 import { isOwner } from '../permissions'
 import { PageHeader } from './PageHeader'
+import { NewProjectModal } from './NewProjectModal'
 import { StatusPill } from './StatusPill'
 import { dueLabel, formatCurrency, formatHours, monthKey } from '../format'
 import { useFakeLoad } from '../useFakeLoad'
@@ -13,6 +14,7 @@ export function TeamDashboard() {
   const navigate = useNavigate()
   const isLoading = useFakeLoad()
   const [editorFilter, setEditorFilter] = useState<'all' | string>('all')
+  const [showNewProject, setShowNewProject] = useState(false)
 
   const editors = useMemo(() => users.filter((u) => u.role === 'editor'), [users])
   const clientById = useMemo(
@@ -69,7 +71,16 @@ export function TeamDashboard() {
 
   return (
     <>
-      <PageHeader eyebrow={`Welcome back, ${firstName}`} title="Team" />
+      <PageHeader
+        eyebrow={`Welcome back, ${firstName}`}
+        title="Team"
+        actions={
+          <button type="button" className="primary-button" onClick={() => setShowNewProject(true)}>
+            <Plus size={14} /> New project
+          </button>
+        }
+      />
+      {showNewProject ? <NewProjectModal onClose={() => setShowNewProject(false)} /> : null}
 
       {isLoading ? (
         <div className="hours-skeleton" aria-hidden="true">

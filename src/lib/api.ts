@@ -89,9 +89,34 @@ export const api = {
       body: JSON.stringify({ projectId, hours, date }),
     }),
   invite: (fullName: string, email: string, role: Role) =>
-    request<{ user: User }>('/api/users/invite', {
+    request<{ user: User; inviteUrl: string }>('/api/users/invite', {
       method: 'POST',
       body: JSON.stringify({ fullName, email, role }),
+    }),
+  createClient: (name: string) =>
+    request<{ client: Client }>('/api/clients', { method: 'POST', body: JSON.stringify({ name }) }),
+  createProject: (data: {
+    title: string
+    clientId: string
+    deliverableType: string
+    assignedEditorId: string | null
+    dueDate: string
+    brief: string
+  }) => request<{ project: Project }>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: true }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+  getInvite: (inviteToken: string) =>
+    request<{ fullName: string; email: string; role: Role }>(`/api/auth/invite/${inviteToken}`),
+  claim: (data: { token: string; password: string; fullName?: string; timezone?: string }) =>
+    request<{ token: string; user: User }>('/api/auth/claim', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }).then((result) => {
+      setToken(result.token)
+      return result
     }),
   updateUser: (userId: string, patch: Partial<User>) =>
     request<{ user: User }>(`/api/users/${userId}`, { method: 'PATCH', body: JSON.stringify(patch) }),

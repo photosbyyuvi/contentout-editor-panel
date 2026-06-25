@@ -5,15 +5,60 @@ import bcrypt from 'bcryptjs'
 import { repo, defaultNotificationPrefs } from './db.js'
 
 const PORT = Number(process.env.PORT || 8787)
-const JWT_SECRET = process.env.JWT_SECRET || 'contentout-dev-secret-change-in-prod'
+const DEFAULT_SECRET = 'contentout-dev-secret-change-in-prod'
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
 const AI_MODEL = 'claude-sonnet-4-6'
 
+// Refuse to boot in production with the default signing secret.
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === DEFAULT_SECRET) {
+  throw new Error('Set a strong JWT_SECRET in production (see DEPLOYMENT.md).')
+}
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
 const app = express()
-app.use(cors())
+app.disable('x-powered-by')
+app.use(
+  cors(
+    allowedOrigins.length > 0
+      ? { origin: allowedOrigins }
+      : {}, // allow all in dev when ALLOWED_ORIGINS is unset
+  ),
+)
 app.use(express.json())
+
+// basic security headers
+app.use((_req, res, nextFn) => {
+  res.set('X-Content-Type-Options', 'nosniff')
+  res.set('X-Frame-Options', 'DENY')
+  res.set('Referrer-Policy', 'no-referrer')
+  nextFn()
+})
+
+// simple in-memory login rate limit (per IP)
+const loginAttempts = new Map()
+function rateLimitLogin(req, res, nextFn) {
+  const key = req.ip || 'unknown'
+  const nowMs = Date.now()
+  const entry = loginAttempts.get(key) || { count: 0, resetAt: nowMs + 15 * 60 * 1000 }
+  if (nowMs > entry.resetAt) {
+    entry.count = 0
+    entry.resetAt = nowMs + 15 * 60 * 1000
+  }
+  entry.count += 1
+  loginAttempts.set(key, entry)
+  if (entry.count > 20) {
+    return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' })
+  }
+  nextFn()
+}
 
 const uid = (p) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 const now = () => new Date().toISOString()
@@ -117,7 +162,7 @@ function auth(req, res, next) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ai: Boolean(ANTHROPIC_API_KEY) }))
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', rateLimitLogin, (req, res) => {
   const { email, password } = req.body || {}
   const user = repo.getUserByEmail(String(email || ''))
   if (!user || user.status === 'disabled' || !bcrypt.compareSync(String(password || ''), user.passwordHash)) {
@@ -126,6 +171,66 @@ app.post('/api/auth/login', (req, res) => {
   repo.touchActive(user.id)
   const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '12h' })
   res.json({ token, user: sanitizeUser(user, user) })
+})
+
+app.post('/api/auth/change-password', auth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {}
+  if (!bcrypt.compareSync(String(currentPassword || ''), req.user.passwordHash)) {
+    return res.status(400).json({ error: 'Current password is incorrect.' })
+  }
+  if (String(newPassword || '').length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' })
+  }
+  repo.setPassword(req.user.id, bcrypt.hashSync(String(newPassword), 10))
+  res.json({ ok: true })
+})
+
+// Accept an invite: set password (+ optional profile) and activate the account.
+app.post('/api/auth/claim', (req, res) => {
+  const { token, password, fullName, avatarInitials, timezone } = req.body || {}
+  let payload
+  try {
+    payload = jwt.verify(String(token || ''), JWT_SECRET)
+  } catch {
+    return res.status(400).json({ error: 'This invite link is invalid or has expired.' })
+  }
+  if (payload.purpose !== 'claim') {
+    return res.status(400).json({ error: 'Invalid invite token.' })
+  }
+  const user = repo.getUser(payload.sub)
+  if (!user) {
+    return res.status(404).json({ error: 'Profile not found.' })
+  }
+  if (String(password || '').length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' })
+  }
+  repo.updateUser(user.id, {
+    fullName: fullName || user.fullName,
+    avatarInitials: avatarInitials || user.avatarInitials,
+    timezone: timezone || user.timezone,
+    status: 'active',
+  })
+  repo.setPassword(user.id, bcrypt.hashSync(String(password), 10))
+  repo.touchActive(user.id)
+  const authToken = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '12h' })
+  res.json({ token: authToken, user: sanitizeUser(repo.getUser(user.id), repo.getUser(user.id)) })
+})
+
+// Preview an invite (name/email) so the claim page can greet the user.
+app.get('/api/auth/invite/:token', (req, res) => {
+  try {
+    const payload = jwt.verify(req.params.token, JWT_SECRET)
+    if (payload.purpose !== 'claim') {
+      throw new Error('bad')
+    }
+    const user = repo.getUser(payload.sub)
+    if (!user) {
+      throw new Error('missing')
+    }
+    res.json({ fullName: user.fullName, email: user.email, role: user.role })
+  } catch {
+    res.status(400).json({ error: 'Invalid or expired invite.' })
+  }
 })
 
 app.get('/api/bootstrap', auth, (req, res) => {
@@ -324,12 +429,54 @@ app.post('/api/users/invite', auth, (req, res) => {
   }
   const initials = String(fullName || '').split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || 'NA'
   const user = repo.addUser({
-    id: uid('u'), fullName, email, passwordHash: bcrypt.hashSync('contentout', 10), role, status: 'invited',
+    id: uid('u'), fullName, email, passwordHash: bcrypt.hashSync(uid('tmp'), 10), role, status: 'invited',
     avatarInitials: initials, timezone: 'America/Toronto', payModel: role === 'editor' ? 'hourly' : null,
     hourlyRate: role === 'editor' ? 20 : null, flatRates: null, createdAt: now(), lastActiveAt: now(),
     notificationPrefs: defaultNotificationPrefs(),
   })
-  res.json({ user: sanitizeUser(req.user, user) })
+  const claimToken = jwt.sign({ sub: user.id, purpose: 'claim' }, JWT_SECRET, { expiresIn: '7d' })
+  const inviteUrl = `${FRONTEND_URL}/claim?token=${claimToken}`
+  res.json({ user: sanitizeUser(req.user, user), inviteUrl })
+})
+
+app.post('/api/clients', auth, (req, res) => {
+  if (!isManager(req.user)) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+  const name = String(req.body?.name || '').trim()
+  if (!name) {
+    return res.status(400).json({ error: 'Client name is required.' })
+  }
+  const palette = ['#3B82F6', '#22C55E', '#A855F7', '#F5A623', '#EC4899', '#14B8A6']
+  const client = repo.addClient({
+    id: uid('c'),
+    name,
+    accentColor: req.body?.accentColor || palette[repo.listClients().length % palette.length],
+  })
+  res.json({ client })
+})
+
+app.post('/api/projects', auth, (req, res) => {
+  if (!isManager(req.user)) {
+    return res.status(403).json({ error: 'Only managers can create projects.' })
+  }
+  const { title, clientId, deliverableType, assignedEditorId, dueDate, brief, specs } = req.body || {}
+  if (!String(title || '').trim() || !clientId) {
+    return res.status(400).json({ error: 'Title and client are required.' })
+  }
+  const defaultSpecs = { aspectRatio: '9:16', resolution: '1080x1920', bitrate: '12 Mbps H.264', fileNaming: `${String(title).replace(/\s+/g, '_')}_v{n}.mp4` }
+  const project = repo.addProject({
+    id: uid('p'), clientId, title: String(title).trim(), deliverableType: deliverableType || 'reel',
+    assignedEditorId: assignedEditorId || null, createdByUserId: req.user.id, status: 'not_started',
+    dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString(),
+    deliveryLink: null, approvedAt: null, brief: String(brief || '').trim(),
+    specs: specs || defaultSpecs, assetLinks: [], deliveries: [], revisions: [], comments: [],
+  })
+  logActivity(req.user.id, 'created project', project.id)
+  if (project.assignedEditorId) {
+    createNotification(project.assignedEditorId, 'assignment', project.id, `New project assigned: ${project.title}`)
+  }
+  res.json({ project })
 })
 
 app.patch('/api/users/:id', auth, (req, res) => {

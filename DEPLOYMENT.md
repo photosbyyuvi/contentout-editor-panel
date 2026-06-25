@@ -14,20 +14,32 @@ npm run dev:all      # starts the API (:8787) and the Vite app (:5173) together
 
 `.env.local` already contains `VITE_API_URL=http://localhost:8787`. Sign in with any seeded account (password `contentout`), e.g. `yuvi@contentout.co` (owner), `amrit@contentout.co` (admin), `savithru@contentout.co` (editor). Data persists in `server/data/portal.db` across restarts.
 
-## Production
+## Production — step by step
 
-**Frontend** → Vercel (or any static host). `vercel.json` is included (SPA rewrites). Set the project env var `VITE_API_URL` to your deployed backend URL.
-
-**Backend** (`server/`) → any Node host (Railway, Render, Fly.io, a VM). Set:
+**1. Backend** (`server/`) → any Node host. A Render blueprint (`render.yaml`) and a `Dockerfile` are included; Railway/Fly/a VM work too.
 
 | Var | Purpose |
 |---|---|
-| `JWT_SECRET` | long random string that signs sessions (required) |
-| `PORT` | listen port (default 8787) |
-| `SQLITE_PATH` | path to the SQLite file on a persistent volume |
+| `JWT_SECRET` | long random string that signs sessions (**required**; the server refuses to boot in production with the default) |
+| `NODE_ENV` | set to `production` |
+| `SEED_DEMO` | `false` for a clean launch (seeds only the owner + clients, no demo team/projects) |
+| `OWNER_EMAIL` / `OWNER_PASSWORD` / `OWNER_NAME` | the real Owner account created on first boot |
+| `SQLITE_PATH` | path to the DB on a persistent volume (e.g. `/data/portal.db`) |
+| `FRONTEND_URL` | your app URL, used to build invite links |
+| `ALLOWED_ORIGINS` | comma-separated origins allowed to call the API (e.g. your frontend URL) |
 | `ANTHROPIC_API_KEY` | enables live AI Mode (otherwise graceful fallback) |
 | `RESEND_API_KEY` | enables real notification emails |
 | `DISCORD_WEBHOOK_URL` | enables Discord notifications |
+
+**2. Frontend** → Vercel (or any static host). `vercel.json` is included (SPA rewrites). Set `VITE_API_URL` to your deployed backend URL.
+
+## Onboarding your team (no seed editing required)
+
+1. Sign in as the Owner (the `OWNER_EMAIL` / `OWNER_PASSWORD` you set).
+2. Go to **People → Invite a profile** (email + role). You get an **invite link** — send it to the teammate.
+3. They open the link (`/claim?token=…`), set their own name, timezone, and password, and land in their role-appropriate home.
+4. Anyone can change their password anytime under **Profile → Change password**.
+5. Create real work from **Team → New project** (pick or add a client, assign an editor, optional AI-drafted brief). The assigned editor is notified instantly.
 
 ### Database
 

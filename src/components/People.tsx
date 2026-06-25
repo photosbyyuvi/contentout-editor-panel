@@ -15,6 +15,7 @@ export function People() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>(roles[0] ?? 'editor')
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
 
   const projectsByEditor = useMemo(() => {
     const map: Record<string, number> = {}
@@ -30,11 +31,12 @@ export function People() {
     return null
   }
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (!name.trim() || !email.trim()) {
       return
     }
-    inviteUser(name.trim(), email.trim(), role)
+    const link = await inviteUser(name.trim(), email.trim(), role)
+    setInviteLink(link)
     setName('')
     setEmail('')
   }
@@ -144,7 +146,20 @@ export function People() {
                   <UserPlus size={14} /> Invite
                 </button>
               </div>
-              <p className="helper">Invited profiles appear with an “invited” status and a mock invite link.</p>
+              <p className="helper">Invited profiles appear with an “invited” status. Send them their invite link to set a password.</p>
+              {inviteLink ? (
+                <div className="invite-link">
+                  <span className="invite-link-label">Invite link</span>
+                  <input readOnly value={inviteLink} onFocus={(e) => e.currentTarget.select()} />
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => navigator.clipboard?.writeText(inviteLink)}
+                  >
+                    Copy
+                  </button>
+                </div>
+              ) : null}
             </section>
           ) : null}
         </>

@@ -1,0 +1,39 @@
+# One-click backend deploy on Render (https://render.com).
+# Frontend deploys separately on Vercel (vercel.json). See DEPLOYMENT.md.
+services:
+  - type: web
+    name: contentout-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm run server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SEED_DEMO
+        value: "false"
+      - key: SQLITE_PATH
+        value: /data/portal.db
+      - key: OWNER_EMAIL
+        sync: false
+      - key: OWNER_PASSWORD
+        sync: false
+      - key: OWNER_NAME
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

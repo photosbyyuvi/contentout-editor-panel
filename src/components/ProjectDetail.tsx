@@ -211,7 +211,7 @@ export function ProjectDetail() {
           ) : (
             <h1 className="page-title">{project.title}</h1>
           )}
-          <StatusPill status={project.status} />
+          <StatusPill key={project.status} status={project.status} />
         </div>
         <div className="detail-action">
           {primaryAction()}
@@ -521,7 +521,8 @@ export function ProjectDetail() {
             <section className="surface">
               <h2 className="section-head">Status</h2>
               <p className="muted">
-                {STATUS_LABELS[project.status]} · assigned to {userName(project.assignedEditorId)}
+                {STATUS_LABELS[project.status]} ·{' '}
+                {project.assignedEditorId ? `assigned to ${userName(project.assignedEditorId)}` : 'Unassigned'}
               </p>
             </section>
           )}

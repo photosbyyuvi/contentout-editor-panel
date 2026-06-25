@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Inbox } from 'lucide-react'
+import { ArrowRight, Inbox, SearchX } from 'lucide-react'
 import { useApp, useEditorProjects } from '../store'
 import { PageHeader } from './PageHeader'
 import { StatusPill } from './StatusPill'
@@ -26,6 +26,9 @@ export function Queue() {
 
   const [clientFilter, setClientFilter] = useState<'all' | string>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const itemRefs = useRef<Record<string, HTMLLIElement | null>>({})
+  const prevTops = useRef<Map<string, number>>(new Map())
 
   const clientById = useMemo(
     () => Object.fromEntries(clients.map((client) => [client.id, client])),
@@ -58,6 +61,39 @@ export function Queue() {
   }
 
   const firstName = user?.fullName.split(' ')[0] ?? 'there'
+
+  // FLIP reorder (Q4): animate cards to new positions when the queue re-sorts.
+  useLayoutEffect(() => {
+    const nextTops = new Map<string, number>()
+    for (const project of visibleProjects) {
+      const node = itemRefs.current[project.id]
+      if (node) {
+        nextTops.set(project.id, node.getBoundingClientRect().top)
+      }
+    }
+    let index = 0
+    for (const project of visibleProjects) {
+      const node = itemRefs.current[project.id]
+      const prev = prevTops.current.get(project.id)
+      const next = nextTops.get(project.id)
+      if (node && prev !== undefined && next !== undefined) {
+        const delta = prev - next
+        if (Math.abs(delta) > 1) {
+          const stagger = Math.min(index * 30, 180)
+          node.style.transform = `translateY(${delta}px)`
+          node.style.transition = 'transform 0s'
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              node.style.transform = ''
+              node.style.transition = `transform 240ms cubic-bezier(0.2,0,0,1) ${stagger}ms`
+            })
+          })
+        }
+      }
+      index += 1
+    }
+    prevTops.current = nextTops
+  }, [visibleProjects])
 
   return (
     <>
@@ -128,12 +164,13 @@ export function Queue() {
         </ul>
       ) : projects.length === 0 ? (
         <div className="empty-state">
-          <Inbox size={28} aria-hidden="true" />
+          <Inbox size={48} strokeWidth={1.5} aria-hidden="true" />
           <h2>Nothing assigned yet</h2>
           <p className="muted">Check back soon, or message the team.</p>
         </div>
       ) : visibleProjects.length === 0 ? (
         <div className="empty-state">
+          <SearchX size={48} strokeWidth={1.5} aria-hidden="true" />
           <h2>No projects match these filters</h2>
           <button type="button" className="secondary-button" onClick={clearFilters}>
             Clear filters
@@ -146,7 +183,12 @@ export function Queue() {
             const due = dueLabel(project.dueDate, user?.timezone ?? 'UTC', project.status)
             const openRound = project.revisions.find((revision) => revision.resolvedAt === null)
             return (
-              <li key={project.id}>
+              <li
+                key={project.id}
+                ref={(node) => {
+                  itemRefs.current[project.id] = node
+                }}
+              >
                 <Link to={`/project/${project.id}`} className="queue-card">
                   <div className="queue-card-top">
                     <span className="queue-client">

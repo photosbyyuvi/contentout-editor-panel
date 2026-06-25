@@ -114,7 +114,7 @@ export type Project = {
   assetLinks: AssetLink[]
   status: ProjectStatus
   dueDate: string
-  assignedEditorId: string
+  assignedEditorId: string | null
   createdByUserId: string
   revisions: RevisionRound[]
   comments: Comment[]

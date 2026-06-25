@@ -19,7 +19,9 @@ export function People() {
   const projectsByEditor = useMemo(() => {
     const map: Record<string, number> = {}
     for (const project of projects) {
-      map[project.assignedEditorId] = (map[project.assignedEditorId] ?? 0) + 1
+      if (project.assignedEditorId) {
+        map[project.assignedEditorId] = (map[project.assignedEditorId] ?? 0) + 1
+      }
     }
     return map
   }, [projects])

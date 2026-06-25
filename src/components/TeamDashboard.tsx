@@ -30,7 +30,7 @@ export function TeamDashboard() {
       overdue: projects.filter(
         (p) => p.status !== 'approved' && new Date(p.dueDate).getTime() < Date.now(),
       ).length,
-      awaiting: projects.filter((p) => p.status === 'not_started').length,
+      awaiting: projects.filter((p) => p.assignedEditorId === null).length,
       active: projects.filter((p) => p.status !== 'approved').length,
     }),
     [projects],
@@ -129,7 +129,7 @@ export function TeamDashboard() {
             <ul className="team-project-list">
               {visible.map((project) => {
                 const client = clientById[project.clientId]
-                const editor = editorById[project.assignedEditorId]
+                const editor = project.assignedEditorId ? editorById[project.assignedEditorId] : null
                 const due = dueLabel(project.dueDate, 'America/Toronto', project.status)
                 return (
                   <li key={project.id}>
@@ -141,7 +141,7 @@ export function TeamDashboard() {
                         </span>
                         <span className="team-project-title">{project.title}</span>
                       </span>
-                      <span className="team-project-editor">{editor?.fullName}</span>
+                      <span className="team-project-editor">{editor?.fullName ?? 'Unassigned'}</span>
                       <span className={`due-label urgency-${due.urgency} tabular`}>{due.text}</span>
                       <StatusPill status={project.status} />
                     </Link>

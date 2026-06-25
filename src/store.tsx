@@ -209,7 +209,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newDelivery: Delivery = {
         id: uid('dl'),
         projectId,
-        editorId: project.assignedEditorId,
+        editorId: project.assignedEditorId ?? actingUser.id,
         fileLink: fileLink.trim(),
         note: note.trim(),
         version,
@@ -269,7 +269,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }))
       logActivity(actingUser.id, `approved delivery v${latestVersion}`, projectId)
       showToast('Delivery approved')
-      deliverNotification(project.assignedEditorId, 'approval', projectId, `${project.title} approved 🎉`)
+      if (project.assignedEditorId) {
+        deliverNotification(project.assignedEditorId, 'approval', projectId, `${project.title} approved 🎉`)
+      }
     },
     [actingUser, projects, patchProject, logActivity, showToast, deliverNotification],
   )
@@ -312,12 +314,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }))
       logActivity(actingUser.id, 'requested changes', projectId)
       showToast('Changes requested')
-      deliverNotification(
-        project.assignedEditorId,
-        'revision',
-        projectId,
-        `Changes requested on ${project.title}`,
-      )
+      if (project.assignedEditorId) {
+        deliverNotification(
+          project.assignedEditorId,
+          'revision',
+          projectId,
+          `Changes requested on ${project.title}`,
+        )
+      }
     },
     [actingUser, projects, patchProject, logActivity, showToast, deliverNotification],
   )

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { useApp } from '../store'
 import { Sidebar } from './Sidebar'
+import { CommandPalette } from './CommandPalette'
 
 export function Layout() {
   const { theme, toast, dismissToast, isViewingAs, user, exitViewAs } = useApp()
@@ -81,6 +82,8 @@ export function Layout() {
           {toast.message}
         </div>
       ) : null}
+
+      <CommandPalette />
     </div>
   )
 }

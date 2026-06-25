@@ -63,6 +63,8 @@
   --st-overdue: #f87171;
 
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --overlay-bg: rgba(20, 20, 23, 0.85);
+  --overlay-border: rgba(255, 255, 255, 0.08);
 }
 
 /* Light theme (independently tuned) — Part C2 */
@@ -92,6 +94,8 @@
   --st-overdue: #dc2626;
 
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(255, 255, 255, 0.85);
+  --overlay-border: rgba(0, 0, 0, 0.06);
 }
 
 /* ============================================================
@@ -133,7 +137,18 @@ a {
 .tabular {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
+  font-feature-settings: 'tnum' 1, 'cv01' 1;
+}
+
+.page-title,
+.queue-title,
+.section-head,
+.signin-card-head h1,
+.empty-state h2 {
+  text-wrap: balance;
+}
+.prose {
+  text-wrap: pretty;
 }
 
 .muted {
@@ -350,9 +365,10 @@ textarea {
   line-height: 22px;
 }
 
+/* Q7 — focus ring: 2px offset gap + 2px ring via box-shadow */
 :focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--focus-ring);
 }
 
 /* ============================================================
@@ -594,8 +610,9 @@ textarea {
   top: calc(100% + 8px);
   width: 320px;
   max-width: 84vw;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  background: var(--overlay-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--overlay-border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-md);
   z-index: 40;
@@ -887,12 +904,16 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--s-12);
+  gap: var(--s-16);
+  min-height: 320px;
   padding: var(--s-48) var(--s-24);
   text-align: center;
   border: 1px dashed var(--border-default);
   border-radius: var(--r-lg);
   color: var(--text-tertiary);
+}
+.empty-state h2 {
+  margin-top: var(--s-4);
 }
 .empty-state h2 {
   font-size: 18px;
@@ -2126,5 +2147,147 @@ textarea {
   }
   .team-project-editor {
     display: none;
+  }
+}
+
+/* ============================================================
+   Part Q — command palette, signature pill cross-fade
+   ============================================================ */
+.overlay-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+.cmd-palette,
+.cmd-help {
+  width: 560px;
+  max-width: 92vw;
+  background: var(--overlay-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--overlay-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  animation: overlay-in var(--t-base) var(--ease-in);
+}
+.cmd-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-12);
+  padding: var(--s-16);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.cmd-input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.cmd-input:focus-visible {
+  box-shadow: none;
+}
+.cmd-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--s-8);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.cmd-group {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: var(--s-8) var(--s-8) var(--s-4);
+}
+.cmd-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-12);
+  padding: var(--s-8) var(--s-12);
+  border: none;
+  background: transparent;
+  border-radius: var(--r-md);
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.cmd-item-active {
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+}
+.cmd-empty {
+  padding: var(--s-16);
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+.cmd-help-head {
+  padding: var(--s-16);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.cmd-help-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--s-12) var(--s-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-12);
+}
+.cmd-help-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.cmd-help-list span {
+  margin-left: auto;
+  color: var(--text-tertiary);
+}
+kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+}
+
+/* Signature moment — status pill cross-fades on transition (detail header only) */
+.detail-header .pill {
+  animation: pill-cross-fade 120ms var(--ease-in);
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pill-cross-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

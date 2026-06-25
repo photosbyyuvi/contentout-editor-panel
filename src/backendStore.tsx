@@ -26,7 +26,7 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
   const [viewAsUserId, setViewAsUserId] = useState<string | null>(null)
   const [theme, setTheme] = useState<ThemeMode>('dark')
   const [toast, setToast] = useState<Toast | null>(null)
-  const esRef = useRef<EventSource | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
 
   const showToast = useCallback((message: string) => {
     setToast({ id: ++toastCounter, message })
@@ -100,8 +100,8 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setToken(null)
-    esRef.current?.close()
-    esRef.current = null
+    wsRef.current?.close()
+    wsRef.current = null
     setCurrentUserId(null)
     setViewAsUserId(null)
     setUsers([])
@@ -111,30 +111,40 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
     setActivityLog([])
   }, [])
 
-  // live notifications via SSE (no refresh needed)
+  // live notifications via WebSocket (instant, no refresh)
   useEffect(() => {
     if (!currentUserId) {
       return
     }
-    const source = new EventSource(api.eventsUrl())
-    esRef.current = source
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload.kind === 'notification') {
-          setNotifications((prev) => [payload.notification, ...prev])
-          showToast(payload.notification.body)
+    let closed = false
+    let socket: WebSocket | null = null
+    let retry: number | undefined
+    const connect = () => {
+      socket = new WebSocket(api.wsUrl())
+      wsRef.current = socket
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          if (payload.kind === 'notification') {
+            setNotifications((prev) => [payload.notification, ...prev])
+            showToast(payload.notification.body)
+          }
+        } catch {
+          // ignore non-JSON frames
         }
-      } catch {
-        // ignore keepalive lines
+      }
+      socket.onclose = () => {
+        if (!closed) {
+          retry = window.setTimeout(connect, 2000)
+        }
       }
     }
-    source.onerror = () => {
-      /* browser auto-reconnects */
-    }
+    connect()
     return () => {
-      source.close()
-      esRef.current = null
+      closed = true
+      window.clearTimeout(retry)
+      socket?.close()
+      wsRef.current = null
     }
   }, [currentUserId, showToast])
 

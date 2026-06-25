@@ -1,52 +1,51 @@
-# Deployment — Contentout Team Portal
+# Deploying the Contentout Team Portal on Railway
 
-The portal runs in one of two modes, selected purely by the `VITE_API_URL` env var:
+Everything lives on **one Railway project** with three services: **Postgres** (database), **api** (the Express + WebSocket backend), and **web** (the built SPA). The repo includes `Dockerfile.api`, `Dockerfile.web`, and a static server (`server/static.js`).
 
-- **Demo mode** (no `VITE_API_URL`): the frontend uses an in-memory mock (`src/store.tsx`). Zero config; state resets on reload. Good for previews.
-- **Official mode** (`VITE_API_URL` set): the frontend talks to the real backend in `server/` — credentialed JWT auth, a real database, and server-enforced role permissions (`src/backendStore.tsx`).
+The app has two modes, chosen by `VITE_API_URL`:
+- **Demo mode** (no `VITE_API_URL`): the SPA runs on an in-memory mock. Zero config.
+- **Official mode** (`VITE_API_URL` set): the SPA talks to the real backend → JWT auth, Postgres persistence, server-enforced roles, WebSocket live notifications, streaming AI.
 
 ## Run locally (official mode)
 
+Requires a local Postgres. `.env` (gitignored) holds `DATABASE_URL`, `JWT_SECRET`, etc.
+
 ```bash
 npm install
-npm run dev:all      # starts the API (:8787) and the Vite app (:5173) together
+npm run dev:all          # API on :8787 + Vite on :5173
 ```
 
-`.env.local` already contains `VITE_API_URL=http://localhost:8787`. Sign in with any seeded account (password `contentout`), e.g. `yuvi@contentout.co` (owner), `amrit@contentout.co` (admin), `savithru@contentout.co` (editor). Data persists in `server/data/portal.db` across restarts.
+`.env.local` sets `VITE_API_URL=http://localhost:8787`. Sign in with a seeded account (password `contentout`), e.g. `yuvi@contentout.co`.
 
-## Production — step by step
+## Deploy on Railway — click by click (no prior Railway experience needed)
 
-**1. Backend** (`server/`) → any Node host. A Render blueprint (`render.yaml`) and a `Dockerfile` are included; Railway/Fly/a VM work too.
+1. Go to **railway.app**, sign in with GitHub, and click **New Project → Deploy from GitHub repo**; pick this repo. Railway makes the first service — rename it **api** (service Settings → Name).
+2. **Add Postgres:** in the project, click **New → Database → Add PostgreSQL**. Railway creates a `Postgres` service with a `DATABASE_URL` variable. No setup needed.
+3. **Configure the `api` service** → Settings → **Build**: set **Dockerfile Path** to `Dockerfile.api`. → Settings → **Networking**: click **Generate Domain** (gives a public URL like `api-production.up.railway.app`). → **Variables**, add:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`  *(reference variable — type it exactly)*
+   - `JWT_SECRET` = click the variable's **⋯ → Generate** (random value)
+   - `SEED_DEMO` = `false`
+   - `OWNER_EMAIL` = your email · `OWNER_PASSWORD` = a strong password · `OWNER_NAME` = your name
+   - `NODE_ENV` = `production`
+   - `FRONTEND_URL` = `https://${{web.RAILWAY_PUBLIC_DOMAIN}}`
+   - `ALLOWED_ORIGINS` = `https://${{web.RAILWAY_PUBLIC_DOMAIN}}`
+   - *(optional)* `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `DISCORD_WEBHOOK_URL`
+4. **Add the `web` service:** project → **New → GitHub Repo** → same repo. Rename it **web**. → Settings → **Build**: Dockerfile Path = `Dockerfile.web`. → Settings → **Networking**: **Generate Domain** (this is the URL you'll share with your team). → **Variables**, add:
+   - `VITE_API_URL` = `https://${{api.RAILWAY_PUBLIC_DOMAIN}}`
+5. **Redeploy** both services (Railway usually does this automatically when variables change; if not, each service → **Deploy**). Because the reference variables wire the URLs for you, you never paste a URL by hand.
+6. Open the **web** service's public domain — that's your live portal. Sign in as the owner (`OWNER_EMAIL` / `OWNER_PASSWORD`).
 
-| Var | Purpose |
-|---|---|
-| `JWT_SECRET` | long random string that signs sessions (**required**; the server refuses to boot in production with the default) |
-| `NODE_ENV` | set to `production` |
-| `SEED_DEMO` | `false` for a clean launch (seeds only the owner + clients, no demo team/projects) |
-| `OWNER_EMAIL` / `OWNER_PASSWORD` / `OWNER_NAME` | the real Owner account created on first boot |
-| `SQLITE_PATH` | path to the DB on a persistent volume (e.g. `/data/portal.db`) |
-| `FRONTEND_URL` | your app URL, used to build invite links |
-| `ALLOWED_ORIGINS` | comma-separated origins allowed to call the API (e.g. your frontend URL) |
-| `ANTHROPIC_API_KEY` | enables live AI Mode (otherwise graceful fallback) |
-| `RESEND_API_KEY` | enables real notification emails |
-| `DISCORD_WEBHOOK_URL` | enables Discord notifications |
+### Which secrets you set vs. auto-generated
+- **You set:** `OWNER_EMAIL`, `OWNER_PASSWORD`, `OWNER_NAME`, and any optional `ANTHROPIC_API_KEY` / `RESEND_API_KEY` / `DISCORD_WEBHOOK_URL`.
+- **Auto-generated / auto-wired:** `JWT_SECRET` (Railway "Generate"), `DATABASE_URL` (from the Postgres service), and `FRONTEND_URL` / `ALLOWED_ORIGINS` / `VITE_API_URL` (reference variables).
 
-**2. Frontend** → Vercel (or any static host). `vercel.json` is included (SPA rewrites). Set `VITE_API_URL` to your deployed backend URL.
+## Onboarding your team
+- **Invite:** People → Invite (email + role) → send the generated invite link; they set their own password at `/claim`.
+- **Self-serve sign-up:** new editors can sign up from the login screen (set `ALLOW_SIGNUP=false` on the `api` service to disable).
+- **Passwords:** anyone can change theirs under Profile → Change password.
+- **Create work:** Team → New project (pick/add client, assign, optional AI brief).
 
-## Onboarding your team (no seed editing required)
-
-1. Sign in as the Owner (the `OWNER_EMAIL` / `OWNER_PASSWORD` you set).
-2. Go to **People → Invite a profile** (email + role). You get an **invite link** — send it to the teammate.
-3. They open the link (`/claim?token=…`), set their own name, timezone, and password, and land in their role-appropriate home.
-4. Anyone can change their password anytime under **Profile → Change password**.
-5. Create real work from **Team → New project** (pick or add a client, assign an editor, optional AI-drafted brief). The assigned editor is notified instantly.
-
-### Database
-
-The backend ships on SQLite (`better-sqlite3`) for simplicity and works in production on a host with a persistent volume. To scale, swap the `repo` layer in `server/db.js` for managed Postgres (e.g. Supabase/Neon via a `DATABASE_URL`) — the API routes are storage-agnostic.
-
-### Security notes
-
-- Passwords are bcrypt-hashed; sessions are JWTs (12h).
-- Role permissions are enforced server-side per request (not just hidden UI); billing/pay fields are stripped from API responses for anyone who isn't the Owner or the editor themselves.
-- The Anthropic key is only ever used server-side; it is never shipped to the browser.
+## Notes
+- The backend requires `DATABASE_URL` (Postgres). It refuses to boot in production with the default `JWT_SECRET`.
+- Live notifications use WebSockets (`/ws`); AI chat streams token-by-token. Both work on Railway's always-on infra.
+- Permissions are enforced server-side (pay/billing is stripped from API responses for anyone who isn't the Owner or that editor).

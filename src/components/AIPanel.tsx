@@ -4,6 +4,8 @@ import { useApp, useVisibleProjects } from '../store'
 import { PageHeader } from './PageHeader'
 import { urgencyFor } from '../format'
 import { AI_MODEL, chat, generateBrief, type ChatMessage } from '../ai'
+import { USE_BACKEND } from '../config'
+import { api } from '../lib/api'
 import { DELIVERABLE_LABELS, type DeliverableType } from '../types'
 
 const DELIVERABLES = Object.keys(DELIVERABLE_LABELS) as DeliverableType[]
@@ -48,7 +50,7 @@ export function AIPanel() {
     )
   }
 
-  const onSend = () => {
+  const onSend = async () => {
     const text = input.trim()
     if (!text || thinking) {
       return
@@ -57,11 +59,41 @@ export function AIPanel() {
     setMessages(next)
     setInput('')
     setThinking(true)
-    chat(next, context).then((reply) => {
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
-      setThinking(false)
+    const scrollToEnd = () =>
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }))
-    })
+
+    if (USE_BACKEND) {
+      // stream the reply token-by-token into a growing assistant bubble
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+      try {
+        await api.aiStream({ messages: next, context }, (chunk) => {
+          setMessages((prev) => {
+            const copy = prev.slice()
+            const last = copy[copy.length - 1]
+            if (last && last.role === 'assistant') {
+              copy[copy.length - 1] = { role: 'assistant', content: last.content + chunk }
+            }
+            return copy
+          })
+          scrollToEnd()
+        })
+      } catch {
+        const reply = await chat(next, context)
+        setMessages((prev) => {
+          const copy = prev.slice()
+          copy[copy.length - 1] = { role: 'assistant', content: reply }
+          return copy
+        })
+      }
+      setThinking(false)
+      scrollToEnd()
+      return
+    }
+
+    const reply = await chat(next, context)
+    setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+    setThinking(false)
+    scrollToEnd()
   }
 
   return (
@@ -129,7 +161,7 @@ export function AIPanel() {
               </div>
             ))
           )}
-          {thinking ? <div className="ai-bubble ai-bubble-assistant ai-thinking">Thinking…</div> : null}
+          {thinking && !USE_BACKEND ? <div className="ai-bubble ai-bubble-assistant ai-thinking">Thinking…</div> : null}
         </div>
         <div className="ai-compose">
           <input

@@ -136,5 +136,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ kind, input }),
     }),
-  eventsUrl: () => `${API_URL}/api/events?token=${encodeURIComponent(token ?? '')}`,
+  // Streams the assistant reply token-by-token, invoking onChunk as text arrives.
+  async aiStream(input: unknown, onChunk: (text: string) => void): Promise<void> {
+    const response = await fetch(`${API_URL}/api/ai/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ input }),
+    })
+    if (!response.ok || !response.body) {
+      throw new Error('AI is unavailable right now.')
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) {
+        break
+      }
+      onChunk(decoder.decode(value, { stream: true }))
+    }
+  },
+  wsUrl: () => `${(API_URL ?? '').replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(token ?? '')}`,
 }

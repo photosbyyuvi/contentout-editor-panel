@@ -18,14 +18,43 @@ export type UrgencyState = 'on_track' | 'due_soon' | 'overdue'
 
 export type ThemeMode = 'dark' | 'light'
 
-export type Editor = {
+export type Role = 'owner' | 'admin' | 'editor'
+
+export type UserStatus = 'active' | 'invited' | 'disabled'
+
+export type NotificationType =
+  | 'assignment'
+  | 'feedback'
+  | 'approval'
+  | 'revision'
+  | 'mention'
+  | 'delivery_received'
+
+export type NotificationChannel = 'portal' | 'email' | 'discord' | 'push'
+
+export type DeliveryOutcome = 'pending' | 'approved' | 'changes_requested'
+
+export type NotificationPrefs = {
+  channels: Record<NotificationChannel, boolean>
+  events: Record<NotificationType, boolean>
+}
+
+export type User = {
   id: string
-  name: string
+  fullName: string
+  email: string
+  passwordHash: string
+  role: Role
+  status: UserStatus
+  avatarInitials: string
   timezone: string
-  payModel: PayModel
+  createdAt: string
+  lastActiveAt: string
+  // Editor work fields (null for non-editors unless they also edit)
+  payModel: PayModel | null
   hourlyRate: number | null
   flatRates: Partial<Record<DeliverableType, number>> | null
-  avatarInitials: string
+  notificationPrefs: NotificationPrefs
 }
 
 export type Client = {
@@ -49,15 +78,30 @@ export type AssetLink = {
 export type RevisionRound = {
   round: number
   notes: string[]
+  requestedByUserId: string
   requestedAt: string
   resolvedAt: string | null
 }
 
 export type Comment = {
   id: string
+  authorUserId: string
   authorName: string
   body: string
   createdAt: string
+}
+
+export type Delivery = {
+  id: string
+  projectId: string
+  editorId: string
+  fileLink: string
+  note: string
+  version: number
+  submittedAt: string
+  reviewedByUserId: string | null
+  outcome: DeliveryOutcome
+  reviewedAt: string | null
 }
 
 export type Project = {
@@ -71,8 +115,10 @@ export type Project = {
   status: ProjectStatus
   dueDate: string
   assignedEditorId: string
+  createdByUserId: string
   revisions: RevisionRound[]
   comments: Comment[]
+  deliveries: Delivery[]
   deliveryLink: string | null
   approvedAt: string | null
 }
@@ -86,16 +132,24 @@ export type TimeEntry = {
   rateApplied: number
 }
 
-export type NotificationKind = 'assignment' | 'revisions' | 'approval'
-
 export type AppNotification = {
   id: string
-  kind: NotificationKind
-  projectId: string
-  title: string
+  recipientUserId: string
+  type: NotificationType
+  projectId: string | null
   body: string
   createdAt: string
-  read: boolean
+  readAt: string | null
+  channelsSent: NotificationChannel[]
+}
+
+export type ActivityLog = {
+  id: string
+  actorUserId: string
+  action: string
+  targetType: string
+  targetId: string
+  createdAt: string
 }
 
 export const STATUS_LABELS: Record<ProjectStatus, string> = {
@@ -112,4 +166,44 @@ export const DELIVERABLE_LABELS: Record<DeliverableType, string> = {
   photo_cull: 'Photo cull',
   photo_retouch: 'Photo retouch',
   batch_graphics: 'Batch graphics',
+}
+
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  editor: 'Editor',
+}
+
+export const NOTIFICATION_CHANNELS: NotificationChannel[] = ['portal', 'email', 'discord', 'push']
+
+export const NOTIFICATION_EVENTS: NotificationType[] = [
+  'assignment',
+  'delivery_received',
+  'feedback',
+  'revision',
+  'approval',
+  'mention',
+]
+
+export const NOTIFICATION_EVENT_LABELS: Record<NotificationType, string> = {
+  assignment: 'New assignment',
+  delivery_received: 'Delivery received',
+  feedback: 'Feedback / changes',
+  revision: 'Revision requested',
+  approval: 'Delivery approved',
+  mention: 'Mentions',
+}
+
+export function defaultNotificationPrefs(): NotificationPrefs {
+  return {
+    channels: { portal: true, email: true, discord: true, push: false },
+    events: {
+      assignment: true,
+      delivery_received: true,
+      feedback: true,
+      revision: true,
+      approval: true,
+      mention: true,
+    },
+  }
 }

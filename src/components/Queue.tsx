@@ -20,7 +20,7 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 ]
 
 export function Queue() {
-  const { activeEditor, clients } = useApp()
+  const { user, clients } = useApp()
   const projects = useEditorProjects()
   const isLoading = useFakeLoad()
 
@@ -57,7 +57,7 @@ export function Queue() {
     setStatusFilter('all')
   }
 
-  const firstName = activeEditor?.name.split(' ')[0] ?? 'there'
+  const firstName = user?.fullName.split(' ')[0] ?? 'there'
 
   return (
     <>
@@ -143,7 +143,7 @@ export function Queue() {
         <ul className="queue-list" key={`${clientFilter}-${statusFilter}`}>
           {visibleProjects.map((project) => {
             const client = clientById[project.clientId]
-            const due = dueLabel(project.dueDate, activeEditor?.timezone ?? 'UTC', project.status)
+            const due = dueLabel(project.dueDate, user?.timezone ?? 'UTC', project.status)
             const openRound = project.revisions.find((revision) => revision.resolvedAt === null)
             return (
               <li key={project.id}>

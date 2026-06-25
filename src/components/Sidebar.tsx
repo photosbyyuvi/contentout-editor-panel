@@ -2,20 +2,19 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
   Clock,
+  LayoutDashboard,
   LayoutList,
   LogOut,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Sparkles,
   Sun,
+  Users,
 } from 'lucide-react'
 import { useApp } from '../store'
-
-const NAV_ITEMS = [
-  { to: '/queue', label: 'Queue', Icon: LayoutList },
-  { to: '/hours', label: 'Hours', Icon: Clock },
-  { to: '/resources', label: 'Resources', Icon: BookOpen },
-] as const
+import { isManager } from '../permissions'
+import { ROLE_LABELS } from '../types'
 
 export function Sidebar({
   collapsed,
@@ -26,17 +25,28 @@ export function Sidebar({
   onToggleCollapse: () => void
   onNavigate: () => void
 }) {
-  const { activeEditor, theme, toggleTheme, signOut } = useApp()
+  const { user, theme, toggleTheme, logout } = useApp()
   const navigate = useNavigate()
 
-  if (!activeEditor) {
+  if (!user) {
     return null
   }
+
+  const manager = isManager(user)
+
+  const navItems = [
+    ...(manager ? [{ to: '/team', label: 'Team', Icon: LayoutDashboard }] : []),
+    { to: '/queue', label: 'Queue', Icon: LayoutList },
+    { to: '/hours', label: 'Hours', Icon: Clock },
+    { to: '/resources', label: 'Resources', Icon: BookOpen },
+    { to: '/ai', label: 'AI', Icon: Sparkles },
+    ...(manager ? [{ to: '/people', label: 'People', Icon: Users }] : []),
+  ]
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-head">
-        <NavLink to="/queue" className="wordmark" onClick={onNavigate} aria-label="Contentout — Queue">
+        <NavLink to="/" className="wordmark" onClick={onNavigate} aria-label="Contentout home">
           <span className="wordmark-mark" aria-hidden="true" />
           <span className="wordmark-text">Contentout</span>
         </NavLink>
@@ -51,7 +61,7 @@ export function Sidebar({
       </div>
 
       <nav className="sidebar-nav" aria-label="Primary">
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
+        {navItems.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -66,15 +76,18 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-foot">
-        <div className="editor-card">
+        <NavLink to="/profile" className="editor-card" onClick={onNavigate} title="Your profile">
           <span className="avatar" aria-hidden="true">
-            {activeEditor.avatarInitials}
+            {user.avatarInitials}
           </span>
           <div className="editor-card-text">
-            <span className="editor-name">{activeEditor.name}</span>
-            <span className="editor-tz tabular">{activeEditor.timezone}</span>
+            <span className="editor-name">
+              {user.fullName}
+              <span className={`role-badge role-${user.role}`}>{ROLE_LABELS[user.role]}</span>
+            </span>
+            <span className="editor-tz tabular">{user.timezone}</span>
           </div>
-        </div>
+        </NavLink>
         <div className="sidebar-foot-actions">
           <button
             type="button"
@@ -89,7 +102,7 @@ export function Sidebar({
             type="button"
             className="ghost-button"
             onClick={() => {
-              signOut()
+              logout()
               navigate('/')
             }}
             aria-label="Sign out"

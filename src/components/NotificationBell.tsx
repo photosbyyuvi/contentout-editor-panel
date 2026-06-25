@@ -3,9 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { useApp } from '../store'
 import { relativeTime } from '../format'
+import type { NotificationType } from '../types'
+
+const KIND_CLASS: Record<NotificationType, string> = {
+  assignment: 'notif-kind-assignment',
+  delivery_received: 'notif-kind-assignment',
+  feedback: 'notif-kind-revisions',
+  revision: 'notif-kind-revisions',
+  approval: 'notif-kind-approval',
+  mention: 'notif-kind-approval',
+}
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markNotificationsRead } = useApp()
+  const { notifications, unreadCount, markAllNotificationsRead } = useApp()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -36,7 +46,7 @@ export function NotificationBell() {
     setOpen((prev) => {
       const next = !prev
       if (next) {
-        markNotificationsRead()
+        markAllNotificationsRead()
       }
       return next
     })
@@ -67,21 +77,23 @@ export function NotificationBell() {
             <p className="notif-empty">You're all caught up.</p>
           ) : (
             <ul className="notif-list">
-              {notifications.map((notification) => (
+              {notifications.slice(0, 6).map((notification) => (
                 <li key={notification.id}>
                   <button
                     type="button"
                     role="menuitem"
-                    className="notif-item"
+                    className={`notif-item ${notification.readAt ? '' : 'notif-unread'}`}
                     onClick={() => {
                       setOpen(false)
-                      navigate(`/project/${notification.projectId}`)
+                      navigate(notification.projectId ? `/project/${notification.projectId}` : '/notifications')
                     }}
                   >
-                    <span className={`notif-kind notif-kind-${notification.kind}`} aria-hidden="true" />
+                    <span className={`notif-kind ${KIND_CLASS[notification.type]}`} aria-hidden="true" />
                     <span className="notif-body">
-                      <span className="notif-title">{notification.title}</span>
-                      <span className="notif-sub">{notification.body}</span>
+                      <span className="notif-title">{notification.body}</span>
+                      <span className="notif-sub tabular">
+                        {notification.channelsSent.join(' · ')}
+                      </span>
                     </span>
                     <time className="notif-time tabular">{relativeTime(notification.createdAt)}</time>
                   </button>
@@ -89,6 +101,16 @@ export function NotificationBell() {
               ))}
             </ul>
           )}
+          <button
+            type="button"
+            className="notif-viewall"
+            onClick={() => {
+              setOpen(false)
+              navigate('/notifications')
+            }}
+          >
+            View all notifications
+          </button>
         </div>
       ) : null}
     </div>

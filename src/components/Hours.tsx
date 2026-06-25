@@ -20,10 +20,10 @@ type PeriodSummary = {
 }
 
 export function Hours() {
-  const { activeEditor, timeEntries, logHours } = useApp()
+  const { user, timeEntries, logHours } = useApp()
   const projects = useEditorProjects()
   const isLoading = useFakeLoad()
-  const timezone = activeEditor?.timezone ?? 'UTC'
+  const timezone = user?.timezone ?? 'UTC'
 
   const [logProjectId, setLogProjectId] = useState('')
   const [hoursDraft, setHoursDraft] = useState('')
@@ -37,12 +37,12 @@ export function Hours() {
   )
 
   const editorEntries = useMemo(
-    () => (activeEditor ? timeEntries.filter((entry) => entry.editorId === activeEditor.id) : []),
-    [timeEntries, activeEditor],
+    () => (user ? timeEntries.filter((entry) => entry.editorId === user.id) : []),
+    [timeEntries, user],
   )
 
   const { current, history } = useMemo(() => {
-    if (!activeEditor) {
+    if (!user) {
       return { current: null as PeriodSummary | null, history: [] as PeriodSummary[] }
     }
     const approvedProjects = projects.filter((project) => project.status === 'approved' && project.approvedAt)
@@ -61,12 +61,12 @@ export function Hours() {
           (project) => monthKey(project.approvedAt as string, timezone) === periodKey,
         )
         const pay =
-          activeEditor.payModel === 'hourly'
-            ? periodEntries.reduce((sum, entry) => sum + entry.hours * entry.rateApplied, 0)
-            : periodApprovals.reduce(
-                (sum, project) => sum + (activeEditor.flatRates?.[project.deliverableType] ?? 0),
+          user.payModel === 'flat'
+            ? periodApprovals.reduce(
+                (sum, project) => sum + (user.flatRates?.[project.deliverableType] ?? 0),
                 0,
               )
+            : periodEntries.reduce((sum, entry) => sum + entry.hours * entry.rateApplied, 0)
         return { periodKey, hours, pay, approvedDeliverables: periodApprovals.length }
       })
 
@@ -75,7 +75,7 @@ export function Hours() {
       current: summaries.find((summary) => summary.periodKey === currentKey) ?? null,
       history: summaries.filter((summary) => summary.periodKey !== currentKey),
     }
-  }, [activeEditor, projects, editorEntries, timezone])
+  }, [user, projects, editorEntries, timezone])
 
   const sortedEntries = useMemo(() => {
     return editorEntries.slice().sort((a, b) => {
@@ -84,7 +84,7 @@ export function Hours() {
     })
   }, [editorEntries, sortDescending])
 
-  if (!activeEditor) {
+  if (!user) {
     return null
   }
 
@@ -119,9 +119,9 @@ export function Hours() {
             <p className="period-total tabular">{formatCurrency(current?.pay ?? 0)}</p>
             <p className="muted tabular">
               {formatHours(current?.hours ?? 0)} logged
-              {activeEditor.payModel === 'hourly'
-                ? ` · ${formatCurrency(activeEditor.hourlyRate ?? 0)}/h`
-                : ` · ${current?.approvedDeliverables ?? 0} approved deliverables`}
+              {user.payModel === 'flat'
+                ? ` · ${current?.approvedDeliverables ?? 0} approved deliverables`
+                : ` · ${formatCurrency(user.hourlyRate ?? 0)}/h`}
             </p>
           </section>
 

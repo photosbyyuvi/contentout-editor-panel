@@ -5,7 +5,7 @@ import { useApp } from '../store'
 import { Sidebar } from './Sidebar'
 
 export function Layout() {
-  const { theme, toast, dismissToast } = useApp()
+  const { theme, toast, dismissToast, isViewingAs, user, exitViewAs } = useApp()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -23,6 +23,16 @@ export function Layout() {
 
   return (
     <div className={`app-shell ${mobileOpen ? 'mobile-open' : ''}`}>
+      {isViewingAs ? (
+        <div className="viewas-banner" role="status">
+          <span>
+            Viewing as <strong>{user?.fullName}</strong>
+          </span>
+          <button type="button" className="viewas-exit" onClick={exitViewAs}>
+            Exit
+          </button>
+        </div>
+      ) : null}
       <div className="mobile-bar">
         <button
           type="button"

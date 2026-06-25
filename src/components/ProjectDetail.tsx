@@ -75,14 +75,13 @@ export function ProjectDetail() {
   const submitDisabled = needsLink && effectiveLink.length === 0
 
   const onLogHours = () => {
-    const dateISO = new Date(`${dateDraft}T12:00:00`).toISOString()
-    const result = validateHours(hoursDraft, dateISO)
+    const result = validateHours(hoursDraft, dateDraft, todayInputValue(timezone))
     if (!result.ok) {
       setHoursError(result.error)
       return
     }
     setHoursError(null)
-    logHours(project.id, result.hours, dateISO)
+    logHours(project.id, result.hours, new Date(`${dateDraft}T12:00:00`).toISOString())
     setHoursDraft('')
   }
 

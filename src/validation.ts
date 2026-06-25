@@ -3,7 +3,13 @@ export type HoursValidation =
   | { ok: false; error: string }
 
 // Part F — reject empty, zero, negative, non-numeric, or >24/day; future dates rejected.
-export function validateHours(raw: string, dateISO: string, now: number = Date.now()): HoursValidation {
+// Dates are compared at day granularity (YYYY-MM-DD) in the editor's timezone, so logging
+// "today" is always allowed regardless of the time of day.
+export function validateHours(
+  raw: string,
+  dateInput: string,
+  todayInput: string,
+): HoursValidation {
   const trimmed = raw.trim()
   if (trimmed.length === 0) {
     return { ok: false, error: 'Enter hours between 0.1 and 24.' }
@@ -12,11 +18,8 @@ export function validateHours(raw: string, dateISO: string, now: number = Date.n
   if (!Number.isFinite(hours) || hours < 0.1 || hours > 24) {
     return { ok: false, error: 'Enter hours between 0.1 and 24.' }
   }
-  if (dateISO) {
-    const picked = new Date(dateISO).getTime()
-    if (Number.isFinite(picked) && picked > now + 60_000) {
-      return { ok: false, error: "Date can't be in the future." }
-    }
+  if (dateInput && todayInput && dateInput > todayInput) {
+    return { ok: false, error: "Date can't be in the future." }
   }
   return { ok: true, hours }
 }

@@ -93,14 +93,13 @@ export function Hours() {
       setHoursError('Pick a project to log against.')
       return
     }
-    const dateISO = new Date(`${dateDraft}T12:00:00`).toISOString()
-    const result = validateHours(hoursDraft, dateISO)
+    const result = validateHours(hoursDraft, dateDraft, todayInputValue(timezone))
     if (!result.ok) {
       setHoursError(result.error)
       return
     }
     setHoursError(null)
-    logHours(logProjectId, result.hours, dateISO)
+    logHours(logProjectId, result.hours, new Date(`${dateDraft}T12:00:00`).toISOString())
     setHoursDraft('')
   }
 

@@ -48,6 +48,27 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
     applyBootstrap(data)
   }, [applyBootstrap])
 
+  const mergeProject = useCallback((project: Project) => {
+    setProjects((prev) => prev.map((p) => (p.id === project.id ? project : p)))
+  }, [])
+
+  // optimistic project action: update UI instantly, then sync the rest in the background
+  const projectAction = useCallback(
+    async (fn: () => Promise<{ project: Project }>, successToast?: string) => {
+      try {
+        const { project } = await fn()
+        mergeProject(project)
+        if (successToast) {
+          showToast(successToast)
+        }
+        void refresh()
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Couldn\'t save — try again')
+      }
+    },
+    [mergeProject, refresh, showToast],
+  )
+
   // run an action, refresh, and surface failures without blocking the UI
   const run = useCallback(
     async (fn: () => Promise<unknown>, successToast?: string) => {
@@ -160,20 +181,34 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       toggleTheme: () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
       showToast,
       dismissToast,
-      startEditing: (projectId) => void run(() => api.startEditing(projectId)),
+      startEditing: (projectId) => void projectAction(() => api.startEditing(projectId)),
       submitDelivery: (projectId, fileLink, note) =>
-        void run(async () => {
-          const { toast: message } = await api.submitDelivery(projectId, fileLink, note)
-          showToast(message)
-        }),
-      addComment: (projectId, body) => void run(() => api.addComment(projectId, body)),
+        void (async () => {
+          try {
+            const { project, toast: message } = await api.submitDelivery(projectId, fileLink, note)
+            mergeProject(project)
+            showToast(message)
+            void refresh()
+          } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Couldn\'t save — try again')
+          }
+        })(),
+      addComment: (projectId, body) => void projectAction(() => api.addComment(projectId, body)),
       logHours: (projectId, hours, dateISO) =>
-        void run(() => api.logHours(projectId, hours, dateISO.slice(0, 10)), `Logged ${hours.toFixed(1)}h`),
-      approveDelivery: (projectId) => void run(() => api.review(projectId, 'approved', []), 'Delivery approved'),
+        void (async () => {
+          try {
+            const { entry } = await api.logHours(projectId, hours, dateISO.slice(0, 10))
+            setTimeEntries((prev) => [...prev, entry])
+            showToast(`Logged ${hours.toFixed(1)}h`)
+          } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Couldn\'t save — try again')
+          }
+        })(),
+      approveDelivery: (projectId) => void projectAction(() => api.review(projectId, 'approved', []), 'Delivery approved'),
       requestChanges: (projectId, notes) =>
-        void run(() => api.review(projectId, 'changes_requested', notes), 'Changes requested'),
+        void projectAction(() => api.review(projectId, 'changes_requested', notes), 'Changes requested'),
       updateProject: (projectId, patch) =>
-        void run(() => api.patchProject(projectId, { title: patch.title, brief: patch.brief })),
+        void projectAction(() => api.patchProject(projectId, { title: patch.title, brief: patch.brief })),
       updateUser: (userId, patch) => void run(() => api.updateUser(userId, patch)),
       inviteUser: (fullName, email, role) => void run(() => api.invite(fullName, email, role)),
       changeRole: (userId, role: Role) => void run(() => api.setRole(userId, role)),
@@ -208,6 +243,9 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       run,
+      projectAction,
+      mergeProject,
+      refresh,
       showToast,
       dismissToast,
     ],

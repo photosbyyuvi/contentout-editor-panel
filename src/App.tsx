@@ -785,16 +785,16 @@ function App() {
   }, [queueProjects, selectedProjectId])
 
   useEffect(() => {
-    if (queueProjects.length === 0) {
+    if (scopedProjects.length === 0) {
       setLogProjectId('')
       return
     }
 
-    const exists = queueProjects.some((project) => project.id === logProjectId)
+    const exists = scopedProjects.some((project) => project.id === logProjectId)
     if (!exists) {
-      setLogProjectId(queueProjects[0].id)
+      setLogProjectId(scopedProjects[0].id)
     }
-  }, [queueProjects, logProjectId])
+  }, [scopedProjects, logProjectId])
 
   useEffect(() => {
     if (!toast) {
@@ -1296,7 +1296,11 @@ function App() {
           <div className="hours-form">
             <label>
               Project
-              <select value={logProjectId} onChange={(event) => setLogProjectId(event.target.value)}>
+              <select
+                value={logProjectId}
+                onChange={(event) => setLogProjectId(event.target.value)}
+                disabled={scopedProjects.length === 0}
+              >
                 {scopedProjects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.title}
@@ -1314,7 +1318,7 @@ function App() {
                 onChange={(event) => setHoursDraft(event.target.value)}
               />
             </label>
-            <button type="button" onClick={logHours}>
+            <button type="button" onClick={logHours} disabled={scopedProjects.length === 0}>
               Log hours
             </button>
           </div>
@@ -1419,6 +1423,8 @@ function App() {
             type="button"
             className={activeSection === 'queue' ? 'nav-item nav-item-active' : 'nav-item'}
             onClick={() => setActiveSection('queue')}
+            aria-label="Queue"
+            aria-current={activeSection === 'queue' ? 'page' : undefined}
           >
             <Icon name="queue" className="icon nav-icon" />
             <span className="nav-label">Queue</span>
@@ -1427,6 +1433,8 @@ function App() {
             type="button"
             className={activeSection === 'hours' ? 'nav-item nav-item-active' : 'nav-item'}
             onClick={() => setActiveSection('hours')}
+            aria-label="Hours"
+            aria-current={activeSection === 'hours' ? 'page' : undefined}
           >
             <Icon name="hours" className="icon nav-icon" />
             <span className="nav-label">Hours</span>
@@ -1435,6 +1443,8 @@ function App() {
             type="button"
             className={activeSection === 'resources' ? 'nav-item nav-item-active' : 'nav-item'}
             onClick={() => setActiveSection('resources')}
+            aria-label="Resources"
+            aria-current={activeSection === 'resources' ? 'page' : undefined}
           >
             <Icon name="resources" className="icon nav-icon" />
             <span className="nav-label">Resources</span>
@@ -1465,6 +1475,7 @@ function App() {
             type="button"
             className="theme-toggle"
             onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} theme`}
           >
             <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} className="icon icon-inline" />
             <span>Theme: {themeMode === 'dark' ? 'Dark' : 'Light'}</span>

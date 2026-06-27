@@ -3,13 +3,22 @@ import type {
   ActivityLog,
   AppNotification,
   Client,
+  DeliverableType,
   NotificationPrefs,
+  PayModel,
   Project,
   Role,
   ThemeMode,
   TimeEntry,
   User,
 } from './types'
+
+export type PayUpdate = {
+  payModel: PayModel
+  hourlyRate?: number | null
+  flatRates?: Partial<Record<DeliverableType, number>> | null
+  retainerAmount?: number | null
+}
 
 export type Toast = { id: number; message: string }
 
@@ -53,6 +62,7 @@ export type AppContextValue = {
   inviteUser: (fullName: string, email: string, role: Role) => Promise<string | null>
   changeRole: (userId: string, role: Role) => void
   setUserStatus: (userId: string, status: User['status']) => void
+  updatePay: (userId: string, pay: PayUpdate) => Promise<void>
   createClient: (name: string) => Promise<Client>
   deleteClient: (id: string, cascade: boolean) => Promise<void>
   createProject: (data: NewProjectInput) => Promise<void>

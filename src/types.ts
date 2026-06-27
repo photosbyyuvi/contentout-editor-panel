@@ -1,4 +1,4 @@
-export type PayModel = 'hourly' | 'flat'
+export type PayModel = 'hourly' | 'flat' | 'retainer'
 
 export type DeliverableType =
   | 'reel'
@@ -56,7 +56,14 @@ export type User = {
   payModel: PayModel | null
   hourlyRate: number | null
   flatRates: Partial<Record<DeliverableType, number>> | null
+  retainerAmount: number | null
   notificationPrefs: NotificationPrefs
+}
+
+export const PAY_MODEL_LABELS: Record<PayModel, string> = {
+  hourly: 'Hourly',
+  flat: 'Per deliverable',
+  retainer: 'Monthly retainer',
 }
 
 export type Client = {

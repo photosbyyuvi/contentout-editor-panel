@@ -9,6 +9,7 @@ import { ClientsModal } from './ClientsModal'
 import { StatusPill } from './StatusPill'
 import { dueLabel, formatCurrency, formatHours, monthKey } from '../format'
 import { useFakeLoad } from '../useFakeLoad'
+import { PAY_MODEL_LABELS } from '../types'
 
 export function TeamDashboard() {
   const { user, users, clients, projects, timeEntries, enterViewAs } = useApp()
@@ -62,9 +63,11 @@ export function TeamDashboard() {
           monthKey(p.approvedAt, editor.timezone) === period,
       )
       const pay =
-        editor.payModel === 'flat'
-          ? approved.reduce((sum, p) => sum + (editor.flatRates?.[p.deliverableType] ?? 0), 0)
-          : entries.reduce((sum, entry) => sum + entry.hours * entry.rateApplied, 0)
+        editor.payModel === 'retainer'
+          ? editor.retainerAmount ?? 0
+          : editor.payModel === 'flat'
+            ? approved.reduce((sum, p) => sum + (editor.flatRates?.[p.deliverableType] ?? 0), 0)
+            : entries.reduce((sum, entry) => sum + entry.hours * entry.rateApplied, 0)
       return { editor, hours, pay }
     })
   }, [editors, timeEntries, projects])
@@ -187,7 +190,7 @@ export function TeamDashboard() {
                   {billing.map(({ editor, hours, pay }) => (
                     <tr key={editor.id}>
                       <td>{editor.fullName}</td>
-                      <td className="muted">{editor.payModel === 'flat' ? 'Flat / deliverable' : 'Hourly'}</td>
+                      <td className="muted">{PAY_MODEL_LABELS[editor.payModel ?? 'hourly']}</td>
                       <td className="num tabular">{formatHours(hours)}</td>
                       <td className="num tabular">{formatCurrency(pay)}</td>
                       <td className="num">

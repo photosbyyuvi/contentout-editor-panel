@@ -3,12 +3,21 @@ import type {
   ActivityLog,
   AppNotification,
   Client,
+  DeliverableType,
   NotificationPrefs,
+  PayModel,
   Project,
   Role,
   TimeEntry,
   User,
 } from '../types'
+
+export type PayUpdate = {
+  payModel: PayModel
+  hourlyRate?: number | null
+  flatRates?: Partial<Record<DeliverableType, number>> | null
+  retainerAmount?: number | null
+}
 
 export type Bootstrap = {
   currentUser: User
@@ -135,6 +144,8 @@ export const api = {
     request<{ user: User }>(`/api/users/${userId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   setRole: (userId: string, role: Role) =>
     request<{ user: User }>(`/api/users/${userId}/role`, { method: 'POST', body: JSON.stringify({ role }) }),
+  setPay: (userId: string, pay: PayUpdate) =>
+    request<{ user: User }>(`/api/users/${userId}/pay`, { method: 'PATCH', body: JSON.stringify(pay) }),
   setStatus: (userId: string, status: User['status']) =>
     request<{ user: User }>(`/api/users/${userId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
   updatePrefs: (userId: string, notificationPrefs: NotificationPrefs) =>

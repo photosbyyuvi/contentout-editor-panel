@@ -26,6 +26,7 @@ export const USERS: User[] = [
     flatRates: null,
     createdAt: '2025-09-01T12:00:00-04:00',
     lastActiveAt: '2026-06-25T08:40:00-04:00',
+    retainerAmount: null,
     notificationPrefs: defaultNotificationPrefs(),
   },
   {
@@ -42,6 +43,7 @@ export const USERS: User[] = [
     flatRates: null,
     createdAt: '2025-11-15T12:00:00-05:00',
     lastActiveAt: '2026-06-25T08:10:00-04:00',
+    retainerAmount: null,
     notificationPrefs: defaultNotificationPrefs(),
   },
   {
@@ -58,6 +60,7 @@ export const USERS: User[] = [
     flatRates: null,
     createdAt: '2025-10-02T12:00:00+05:30',
     lastActiveAt: '2026-06-25T17:30:00+05:30',
+    retainerAmount: null,
     notificationPrefs: defaultNotificationPrefs(),
   },
   {
@@ -74,6 +77,7 @@ export const USERS: User[] = [
     flatRates: { reel: 120, long_form: 260, photo_cull: 60, photo_retouch: 80, batch_graphics: 90 },
     createdAt: '2025-10-10T12:00:00+02:00',
     lastActiveAt: '2026-06-25T14:05:00+02:00',
+    retainerAmount: null,
     notificationPrefs: defaultNotificationPrefs(),
   },
   {
@@ -90,6 +94,7 @@ export const USERS: User[] = [
     flatRates: null,
     createdAt: '2025-12-01T12:00:00+05:30',
     lastActiveAt: '2026-06-24T20:15:00+05:30',
+    retainerAmount: null,
     notificationPrefs: defaultNotificationPrefs(),
   },
 ]

@@ -12,7 +12,7 @@ import {
 import { formatHours } from './format'
 import { defaultNotificationPrefs } from './types'
 import { AppContext, type AppContextValue, type Toast } from './appContext'
-import type { NewProjectInput } from './appContext'
+import type { NewProjectInput, PayUpdate } from './appContext'
 import type {
   ActivityLog,
   AppNotification,
@@ -366,10 +366,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       payModel: role === 'editor' ? 'hourly' : null,
       hourlyRate: role === 'editor' ? 20 : null,
       flatRates: null,
+      retainerAmount: null,
       notificationPrefs: defaultNotificationPrefs(),
     }
     setUsers((prev) => [...prev, newUser])
     return null
+  }, [])
+
+  const updatePay = useCallback(async (userId: string, pay: PayUpdate): Promise<void> => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === userId
+          ? {
+              ...u,
+              payModel: pay.payModel ?? u.payModel,
+              hourlyRate: pay.hourlyRate !== undefined ? pay.hourlyRate : u.hourlyRate,
+              flatRates: pay.flatRates !== undefined ? pay.flatRates : u.flatRates,
+              retainerAmount: pay.retainerAmount !== undefined ? pay.retainerAmount : u.retainerAmount,
+            }
+          : u,
+      ),
+    )
   }, [])
 
   const createClient = useCallback(async (name: string): Promise<Client> => {
@@ -505,6 +522,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       inviteUser,
       changeRole,
       setUserStatus,
+      updatePay,
       createClient,
       deleteClient,
       createProject,
@@ -541,6 +559,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       requestChanges,
       updateProject,
       updateUser,
+      updatePay,
       createClient,
       deleteClient,
       createProject,

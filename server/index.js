@@ -62,7 +62,7 @@ function sanitizeUser(viewer, user) {
   const canSeePay = isOwner(viewer) || viewer.id === user.id
   const { passwordHash, ...rest } = user
   void passwordHash
-  return canSeePay ? rest : { ...rest, payModel: null, hourlyRate: null, flatRates: null }
+  return canSeePay ? rest : { ...rest, payModel: null, hourlyRate: null, flatRates: null, retainerAmount: null }
 }
 
 // ── WebSocket live notifications (always-on infra) ──
@@ -505,6 +505,21 @@ app.patch('/api/users/:id', auth, wrap(async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' })
   }
   res.json({ user: sanitizeUser(req.user, await repo.updateUser(req.params.id, req.body || {})) })
+}))
+
+app.patch('/api/users/:id/pay', auth, wrap(async (req, res) => {
+  if (!isOwner(req.user)) {
+    return res.status(403).json({ error: 'Only the owner can edit pay.' })
+  }
+  const { payModel, hourlyRate, flatRates, retainerAmount } = req.body || {}
+  if (payModel && !['hourly', 'flat', 'retainer'].includes(payModel)) {
+    return res.status(400).json({ error: 'Invalid pay model.' })
+  }
+  const updated = await repo.setPay(req.params.id, { payModel, hourlyRate, flatRates, retainerAmount })
+  if (!updated) {
+    return res.status(404).json({ error: 'User not found.' })
+  }
+  res.json({ user: sanitizeUser(req.user, updated) })
 }))
 
 app.post('/api/users/:id/role', auth, wrap(async (req, res) => {

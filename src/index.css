@@ -2443,6 +2443,29 @@ kbd {
   display: flex;
   gap: var(--s-8);
 }
+
+/* Pay editor */
+.pay-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-8);
+}
+.pay-flat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-12);
+}
+.people-actions {
+  display: flex;
+  gap: var(--s-8);
+  justify-content: flex-end;
+  align-items: center;
+}
+@media (max-width: 768px) {
+  .pay-flat-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .danger-button {
   display: inline-flex;
   align-items: center;

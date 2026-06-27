@@ -234,6 +234,10 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       },
       changeRole: (userId, role: Role) => void run(() => api.setRole(userId, role)),
       setUserStatus: (userId, status) => void run(() => api.setStatus(userId, status)),
+      updatePay: async (userId, pay) => {
+        await api.setPay(userId, pay)
+        await refresh()
+      },
       createClient: async (name) => {
         const { client } = await api.createClient(name)
         await refresh()

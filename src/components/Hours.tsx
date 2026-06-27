@@ -61,12 +61,14 @@ export function Hours() {
           (project) => monthKey(project.approvedAt as string, timezone) === periodKey,
         )
         const pay =
-          user.payModel === 'flat'
-            ? periodApprovals.reduce(
-                (sum, project) => sum + (user.flatRates?.[project.deliverableType] ?? 0),
-                0,
-              )
-            : periodEntries.reduce((sum, entry) => sum + entry.hours * entry.rateApplied, 0)
+          user.payModel === 'retainer'
+            ? user.retainerAmount ?? 0
+            : user.payModel === 'flat'
+              ? periodApprovals.reduce(
+                  (sum, project) => sum + (user.flatRates?.[project.deliverableType] ?? 0),
+                  0,
+                )
+              : periodEntries.reduce((sum, entry) => sum + entry.hours * entry.rateApplied, 0)
         return { periodKey, hours, pay, approvedDeliverables: periodApprovals.length }
       })
 
@@ -119,9 +121,11 @@ export function Hours() {
             <p className="period-total tabular">{formatCurrency(current?.pay ?? 0)}</p>
             <p className="muted tabular">
               {formatHours(current?.hours ?? 0)} logged
-              {user.payModel === 'flat'
-                ? ` · ${current?.approvedDeliverables ?? 0} approved deliverables`
-                : ` · ${formatCurrency(user.hourlyRate ?? 0)}/h`}
+              {user.payModel === 'retainer'
+                ? ` · monthly retainer ${formatCurrency(user.retainerAmount ?? 0)}`
+                : user.payModel === 'flat'
+                  ? ` · ${current?.approvedDeliverables ?? 0} approved deliverables`
+                  : ` · ${formatCurrency(user.hourlyRate ?? 0)}/h`}
             </p>
           </section>
 

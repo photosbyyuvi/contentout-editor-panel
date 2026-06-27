@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import { useApp } from '../store'
-import { canChangeRoles, canDisableProfile, invitableRoles } from '../permissions'
+import { canChangeRoles, canDisableProfile, invitableRoles, isOwner } from '../permissions'
 import { PageHeader } from './PageHeader'
 import { relativeTime } from '../format'
-import { ROLE_LABELS, type Role } from '../types'
+import { PAY_MODEL_LABELS, ROLE_LABELS, type Role, type User } from '../types'
 import { useFakeLoad } from '../useFakeLoad'
+import { EditPayModal } from './EditPayModal'
 
 export function People() {
   const { user, users, projects, inviteUser, changeRole, setUserStatus } = useApp()
@@ -16,6 +17,7 @@ export function People() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>(roles[0] ?? 'editor')
   const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [payUser, setPayUser] = useState<User | null>(null)
 
   const projectsByEditor = useMemo(() => {
     const map: Record<string, number> = {}
@@ -44,6 +46,7 @@ export function People() {
   return (
     <>
       <PageHeader eyebrow="Team management" title="People" />
+      {payUser ? <EditPayModal user={payUser} onClose={() => setPayUser(null)} /> : null}
       {isLoading ? (
         <div className="hours-skeleton" aria-hidden="true">
           <div className="surface skeleton-box-lg" />
@@ -96,7 +99,12 @@ export function People() {
                     </td>
                     <td className="tabular">{projectsByEditor[member.id] ?? 0}</td>
                     <td className="muted tabular">{relativeTime(member.lastActiveAt)}</td>
-                    <td className="num">
+                    <td className="num people-actions">
+                      {isOwner(user) && member.role === 'editor' ? (
+                        <button type="button" className="ghost-button" onClick={() => setPayUser(member)}>
+                          Pay: {PAY_MODEL_LABELS[member.payModel ?? 'hourly']}
+                        </button>
+                      ) : null}
                       {canDisableProfile(user) && member.id !== user.id ? (
                         <button
                           type="button"

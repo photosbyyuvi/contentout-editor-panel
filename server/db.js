@@ -105,7 +105,7 @@ async function seedIfEmpty() {
     await client.query('BEGIN')
     for (const u of seedUsers) {
       const password = ownerEmail && u.role === 'owner' && ownerPassword ? ownerPassword : MOCK_PASSWORD
-      const record = { ...u, passwordHash: bcrypt.hashSync(password, 10), notificationPrefs: defaultNotificationPrefs() }
+      const record = { ...u, passwordHash: bcrypt.hashSync(password, 10), retainerAmount: u.retainerAmount ?? null, notificationPrefs: defaultNotificationPrefs() }
       await client.query('INSERT INTO users (id, email, data) VALUES ($1,$2,$3)', [u.id, u.email, record])
     }
     for (const c of SEED_DEMO ? CLIENTS : []) {
@@ -213,9 +213,24 @@ export const repo = {
     return a
   },
   addUser: async (u) => {
-    const record = { ...u, notificationPrefs: u.notificationPrefs ?? defaultNotificationPrefs() }
+    const record = { ...u, retainerAmount: u.retainerAmount ?? null, notificationPrefs: u.notificationPrefs ?? defaultNotificationPrefs() }
     await pool.query('INSERT INTO users (id, email, data) VALUES ($1,$2,$3)', [u.id, u.email, record])
     return record
+  },
+  setPay: async (id, pay) => {
+    const current = await repo.getUser(id)
+    if (!current) {
+      return null
+    }
+    const next = {
+      ...current,
+      payModel: pay.payModel ?? current.payModel,
+      hourlyRate: pay.hourlyRate !== undefined ? pay.hourlyRate : current.hourlyRate,
+      flatRates: pay.flatRates !== undefined ? pay.flatRates : current.flatRates,
+      retainerAmount: pay.retainerAmount !== undefined ? pay.retainerAmount : current.retainerAmount,
+    }
+    await pool.query('UPDATE users SET data = $2 WHERE id = $1', [id, next])
+    return next
   },
   updateUser: async (id, patch) => {
     const current = await repo.getUser(id)

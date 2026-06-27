@@ -9,6 +9,7 @@ import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_LABELS,
+  PAY_MODEL_LABELS,
   ROLE_LABELS,
   defaultNotificationPrefs,
   type DeliverableType,
@@ -122,14 +123,14 @@ export function Profile() {
             <dl className="spec-grid">
               <div>
                 <dt>Pay model</dt>
-                <dd>{user.payModel === 'flat' ? 'Flat / deliverable' : 'Hourly'}</dd>
+                <dd>{PAY_MODEL_LABELS[user.payModel ?? 'hourly']}</dd>
               </div>
-              {user.payModel === 'hourly' ? (
+              {user.payModel === 'retainer' ? (
                 <div>
-                  <dt>Rate</dt>
-                  <dd className="tabular">{formatCurrency(user.hourlyRate ?? 0)}/h</dd>
+                  <dt>Monthly retainer</dt>
+                  <dd className="tabular">{formatCurrency(user.retainerAmount ?? 0)}/mo</dd>
                 </div>
-              ) : (
+              ) : user.payModel === 'flat' ? (
                 <div>
                   <dt>Flat rates</dt>
                   <dd className="tabular">
@@ -137,6 +138,11 @@ export function Profile() {
                       .map(([type, amount]) => `${DELIVERABLE_LABELS[type as DeliverableType]} ${formatCurrency(amount)}`)
                       .join(' · ')}
                   </dd>
+                </div>
+              ) : (
+                <div>
+                  <dt>Rate</dt>
+                  <dd className="tabular">{formatCurrency(user.hourlyRate ?? 0)}/h</dd>
                 </div>
               )}
             </dl>

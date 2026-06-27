@@ -108,7 +108,7 @@ async function seedIfEmpty() {
       const record = { ...u, passwordHash: bcrypt.hashSync(password, 10), notificationPrefs: defaultNotificationPrefs() }
       await client.query('INSERT INTO users (id, email, data) VALUES ($1,$2,$3)', [u.id, u.email, record])
     }
-    for (const c of CLIENTS) {
+    for (const c of SEED_DEMO ? CLIENTS : []) {
       await client.query('INSERT INTO clients (id, data) VALUES ($1,$2)', [c.id, c])
     }
     for (const p of SEED_DEMO ? PROJECTS : []) {

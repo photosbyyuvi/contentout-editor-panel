@@ -29,6 +29,8 @@ export type NotificationType =
   | 'revision'
   | 'mention'
   | 'delivery_received'
+  | 'digest'
+  | 'reminder'
 
 export type NotificationChannel = 'portal' | 'email' | 'discord' | 'push'
 
@@ -183,6 +185,8 @@ export const NOTIFICATION_EVENTS: NotificationType[] = [
   'revision',
   'approval',
   'mention',
+  'digest',
+  'reminder',
 ]
 
 export const NOTIFICATION_EVENT_LABELS: Record<NotificationType, string> = {
@@ -192,6 +196,8 @@ export const NOTIFICATION_EVENT_LABELS: Record<NotificationType, string> = {
   revision: 'Revision requested',
   approval: 'Delivery approved',
   mention: 'Mentions',
+  digest: 'Daily digest',
+  reminder: 'Deadline reminders',
 }
 
 export function defaultNotificationPrefs(): NotificationPrefs {
@@ -204,6 +210,8 @@ export function defaultNotificationPrefs(): NotificationPrefs {
       revision: true,
       approval: true,
       mention: true,
+      digest: true,
+      reminder: true,
     },
   }
 }

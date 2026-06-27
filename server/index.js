@@ -108,7 +108,8 @@ async function createNotification(recipientUserId, type, projectId, body) {
     return
   }
   const prefs = recipient.notificationPrefs ?? defaultNotificationPrefs()
-  if (!prefs.events?.[type]) {
+  // Sensible default: a missing event pref is treated as ON; only an explicit false opts out.
+  if (prefs.events && prefs.events[type] === false) {
     return
   }
   const channels = Object.keys(prefs.channels || {}).filter((c) => prefs.channels[c])
@@ -653,6 +654,84 @@ app.post('/api/ai/stream', auth, wrap(async (req, res) => {
   }
 }))
 
+// ── Scheduled digests + deadline reminders (always-on, in-process; no extra Railway service) ──
+const DIGEST_HOUR = Number(process.env.DIGEST_HOUR || 8) // editor's local hour
+
+function localDate(tz, d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+}
+function localHour(tz, d = new Date()) {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(d))
+}
+
+async function runScheduler({ force = false } = {}) {
+  const nowMs = Date.now()
+  const users = await repo.listUsers()
+  const projects = await repo.listProjects()
+  let digests = 0
+  let reminders = 0
+
+  for (const user of users) {
+    if (user.role !== 'editor' || user.status !== 'active') {
+      continue
+    }
+    const tz = user.timezone || 'America/Toronto'
+    const today = localDate(tz)
+    const mine = projects.filter((p) => p.assignedEditorId === user.id && p.status !== 'approved')
+
+    // ---- Daily digest (once per local day, around DIGEST_HOUR) ----
+    const digestKey = `digest:${user.id}:${today}`
+    const dueWindow = (p) => (new Date(p.dueDate).getTime() - nowMs) / 36e5
+    const overdue = mine.filter((p) => dueWindow(p) < 0)
+    const dueSoon = mine.filter((p) => dueWindow(p) >= 0 && dueWindow(p) <= 24)
+    const inReview = projects.filter((p) => p.assignedEditorId === user.id && p.status === 'submitted')
+    const shouldDigest = force || (localHour(tz) === DIGEST_HOUR && !(await repo.metaGet(digestKey)))
+    if (shouldDigest && mine.length > 0) {
+      const body = `Daily digest — ${mine.length} active: ${dueSoon.length} due soon, ${overdue.length} overdue, ${inReview.length} in review.`
+      await createNotification(user.id, 'digest', null, body)
+      digests += 1
+    }
+    if (!force && localHour(tz) === DIGEST_HOUR) {
+      await repo.metaSet(digestKey, new Date().toISOString())
+    }
+
+    // ---- Deadline reminders (deduped per project per due-date) ----
+    const tomorrow = localDate(tz, new Date(nowMs + 24 * 36e5))
+    for (const p of mine) {
+      const dueLocal = localDate(tz, new Date(p.dueDate))
+      if (dueLocal === tomorrow) {
+        const key = `reminder:due_tomorrow:${p.id}:${dueLocal}`
+        if (force || !(await repo.metaGet(key))) {
+          await createNotification(user.id, 'reminder', p.id, `Due tomorrow: ${p.title}`)
+          if (!force) {
+            await repo.metaSet(key, new Date().toISOString())
+          }
+          reminders += 1
+        }
+      } else if (new Date(p.dueDate).getTime() < nowMs) {
+        const key = `reminder:overdue:${p.id}:${dueLocal}`
+        if (force || !(await repo.metaGet(key))) {
+          await createNotification(user.id, 'reminder', p.id, `Overdue: ${p.title}`)
+          if (!force) {
+            await repo.metaSet(key, new Date().toISOString())
+          }
+          reminders += 1
+        }
+      }
+    }
+  }
+  return { digests, reminders }
+}
+
+// Owner-only manual trigger (handy for testing without waiting for the digest hour).
+app.post('/api/scheduler/run', auth, wrap(async (req, res) => {
+  if (!isOwner(req.user)) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+  const result = await runScheduler({ force: true })
+  res.json(result)
+}))
+
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server, path: '/ws' })
 wss.on('connection', async (ws, req) => {
@@ -677,6 +756,10 @@ repo
     server.listen(PORT, () => {
       console.log(`Contentout API on http://localhost:${PORT}  (AI: ${ANTHROPIC_API_KEY ? 'live' : 'fallback'}, signup: ${ALLOW_SIGNUP})`)
     })
+    // Tick every 15 minutes; digests fire at the editor's local DIGEST_HOUR, deduped per day.
+    setInterval(() => {
+      runScheduler().catch((error) => console.warn('[scheduler]', error.message))
+    }, 15 * 60 * 1000)
   })
   .catch((error) => {
     console.error('Failed to start:', error)

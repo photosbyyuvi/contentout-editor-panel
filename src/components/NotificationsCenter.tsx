@@ -11,6 +11,8 @@ const KIND_CLASS: Record<NotificationType, string> = {
   revision: 'notif-kind-revisions',
   approval: 'notif-kind-approval',
   mention: 'notif-kind-approval',
+  digest: 'notif-kind-digest',
+  reminder: 'notif-kind-revisions',
 }
 
 export function NotificationsCenter() {

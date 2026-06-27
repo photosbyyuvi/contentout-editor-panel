@@ -10,6 +10,7 @@ import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_LABELS,
   ROLE_LABELS,
+  defaultNotificationPrefs,
   type DeliverableType,
   type NotificationChannel,
   type NotificationPrefs,
@@ -54,19 +55,14 @@ export function Profile() {
   const [fullName, setFullName] = useState(user?.fullName ?? '')
   const [initials, setInitials] = useState(user?.avatarInitials ?? '')
   const [timezone, setTimezone] = useState(user?.timezone ?? 'America/Toronto')
-  const [prefs, setPrefs] = useState<NotificationPrefs>(
-    user?.notificationPrefs ?? {
-      channels: { portal: true, email: true, discord: true, push: false },
-      events: {
-        assignment: true,
-        delivery_received: true,
-        feedback: true,
-        revision: true,
-        approval: true,
-        mention: true,
-      },
-    },
-  )
+  const [prefs, setPrefs] = useState<NotificationPrefs>(() => {
+    const base = defaultNotificationPrefs()
+    const up = user?.notificationPrefs
+    return {
+      channels: { ...base.channels, ...(up?.channels ?? {}) },
+      events: { ...base.events, ...(up?.events ?? {}) },
+    }
+  })
 
   if (!user) {
     return null

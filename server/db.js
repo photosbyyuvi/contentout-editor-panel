@@ -245,6 +245,13 @@ export const repo = {
     }
     await pool.query('UPDATE users SET data = $2 WHERE id = $1', [id, current])
   },
+  metaGet: async (key) => {
+    const { rows } = await pool.query('SELECT value FROM meta WHERE key = $1', [key])
+    return rows[0] ? rows[0].value : null
+  },
+  metaSet: async (key, value) => {
+    await pool.query('INSERT INTO meta (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = excluded.value', [key, value])
+  },
   touchActive: async (id) => {
     const current = await repo.getUser(id)
     if (!current) {

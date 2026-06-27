@@ -124,6 +124,6 @@ export const ACTIVITY_LOG = [
 export function defaultNotificationPrefs() {
   return {
     channels: { portal: true, email: true, discord: true, push: false },
-    events: { assignment: true, delivery_received: true, feedback: true, revision: true, approval: true, mention: true },
+    events: { assignment: true, delivery_received: true, feedback: true, revision: true, approval: true, mention: true, digest: true, reminder: true },
   }
 }

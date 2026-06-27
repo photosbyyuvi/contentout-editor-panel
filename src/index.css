@@ -711,6 +711,9 @@ textarea {
 .notif-kind-approval {
   background: var(--st-approved);
 }
+.notif-kind-digest {
+  background: var(--focus-ring);
+}
 .notif-body {
   display: flex;
   flex-direction: column;

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
 import { useApp } from '../appContext'
 import { api } from '../lib/api'
+import { Logo } from './Logo'
 
 export function SignUp() {
   const { login, theme, toggleTheme } = useApp()
@@ -38,8 +39,7 @@ export function SignUp() {
       </button>
 
       <div className="signin-wordmark">
-        <span className="wordmark-mark wordmark-mark-lg" aria-hidden="true" />
-        <span className="signin-wordmark-text">Contentout</span>
+        <Logo className="logo-hero" />
       </div>
 
       <form

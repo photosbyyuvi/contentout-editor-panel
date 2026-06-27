@@ -5,6 +5,7 @@ import { useApp } from '../store'
 import { MOCK_PASSWORD, USERS } from '../data'
 import { ROLE_LABELS } from '../types'
 import { USE_BACKEND } from '../config'
+import { Logo } from './Logo'
 
 export function Login() {
   const { login, theme, toggleTheme } = useApp()
@@ -48,8 +49,7 @@ export function Login() {
       </button>
 
       <div className="signin-wordmark">
-        <span className="wordmark-mark wordmark-mark-lg" aria-hidden="true" />
-        <span className="signin-wordmark-text">Contentout</span>
+        <Logo className="logo-hero" />
       </div>
 
       <form

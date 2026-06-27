@@ -408,6 +408,48 @@ textarea {
   min-height: 36px;
 }
 
+/* Content Out logo lockup (currentColor → theme-aware) */
+.logo {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.2em;
+  color: var(--text-primary);
+  font-size: 20px;
+  line-height: 1;
+}
+.logo-words {
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.82;
+}
+.logo-words span {
+  display: block;
+}
+.logo-arrow {
+  width: auto;
+  height: 0.64em;
+  margin-bottom: 0.05em;
+  flex-shrink: 0;
+}
+.logo-sidebar {
+  font-size: 19px;
+}
+.logo-bar {
+  font-size: 17px;
+}
+.logo-hero {
+  font-size: 42px;
+}
+/* collapsed icon rail: show just the arrow mark */
+.sidebar-collapsed .logo-words {
+  display: none;
+}
+.sidebar-collapsed .logo {
+  gap: 0;
+}
+
 .wordmark {
   display: inline-flex;
   align-items: center;

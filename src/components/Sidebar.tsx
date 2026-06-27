@@ -15,6 +15,7 @@ import {
 import { useApp } from '../store'
 import { isManager } from '../permissions'
 import { ROLE_LABELS } from '../types'
+import { Logo } from './Logo'
 
 export function Sidebar({
   collapsed,
@@ -46,9 +47,8 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-head">
-        <NavLink to="/" className="wordmark" onClick={onNavigate} aria-label="Contentout home">
-          <span className="wordmark-mark" aria-hidden="true" />
-          <span className="wordmark-text">Contentout</span>
+        <NavLink to="/" className="wordmark" onClick={onNavigate} aria-label="Content Out — home">
+          <Logo className="logo-sidebar" />
         </NavLink>
         <button
           type="button"

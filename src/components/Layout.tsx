@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 import { useApp } from '../store'
 import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
+import { Logo } from './Logo'
 
 export function Layout() {
   const { theme, toast, dismissToast, isViewingAs, user, exitViewAs } = useApp()
@@ -43,7 +44,7 @@ export function Layout() {
         >
           <Menu size={20} />
         </button>
-        <span className="wordmark-text">Contentout</span>
+        <Logo className="logo-bar" />
       </div>
 
       {mobileOpen ? (

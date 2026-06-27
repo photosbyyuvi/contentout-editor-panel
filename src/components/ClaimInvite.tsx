@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../appContext'
 import { api } from '../lib/api'
 import { USE_BACKEND } from '../config'
+import { Logo } from './Logo'
 
 const TIMEZONES = ['America/Toronto', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Skopje', 'Asia/Kolkata', 'Asia/Singapore', 'Australia/Sydney']
 
@@ -60,8 +61,7 @@ export function ClaimInvite() {
   return (
     <div className="signin-screen">
       <div className="signin-wordmark">
-        <span className="wordmark-mark wordmark-mark-lg" aria-hidden="true" />
-        <span className="signin-wordmark-text">Contentout</span>
+        <Logo className="logo-hero" />
       </div>
       <div className="signin-card">
         {loadError ? (

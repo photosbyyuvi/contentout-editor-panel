@@ -28,6 +28,11 @@ export const pool = new Pool({
 const SEED_DEMO = process.env.SEED_DEMO !== 'false'
 
 async function init() {
+  // One-time clean slate: set RESET_DB=true for a single deploy, then remove it.
+  if (process.env.RESET_DB === 'true') {
+    await pool.query('DROP TABLE IF EXISTS users, clients, projects, time_entries, notifications, activity_log, meta CASCADE;')
+    console.warn('[db] RESET_DB=true — all tables dropped and reseeded. Remove RESET_DB now so it does not wipe future deploys.')
+  }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, data JSONB NOT NULL);
     CREATE TABLE IF NOT EXISTS clients (id TEXT PRIMARY KEY, data JSONB NOT NULL);
@@ -38,6 +43,47 @@ async function init() {
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
   `)
   await seedIfEmpty()
+  await ensureOwner()
+}
+
+// Runs on EVERY boot (independent of the one-time seed): guarantees the Owner
+// account from OWNER_EMAIL/OWNER_PASSWORD exists and can sign in. The owner
+// password is env-managed — change OWNER_PASSWORD to rotate it.
+async function ensureOwner() {
+  const email = process.env.OWNER_EMAIL
+  if (!email) {
+    return
+  }
+  const password = process.env.OWNER_PASSWORD
+  const name = process.env.OWNER_NAME || 'Owner'
+  const existing = await repo.getUserByEmail(email)
+  if (existing) {
+    if (existing.role !== 'owner' || existing.status !== 'active') {
+      await repo.updateUser(existing.id, { role: 'owner', status: 'active' })
+    }
+    if (password) {
+      await repo.setPassword(existing.id, bcrypt.hashSync(password, 10))
+    }
+    console.log(`[db] ensured Owner account: ${email}`)
+  } else {
+    await repo.addUser({
+      id: `u_owner_${Date.now().toString(36)}`,
+      fullName: name,
+      email,
+      passwordHash: bcrypt.hashSync(password || Math.random().toString(36).slice(2), 10),
+      role: 'owner',
+      status: 'active',
+      avatarInitials: name.slice(0, 2).toUpperCase(),
+      timezone: 'America/Toronto',
+      payModel: null,
+      hourlyRate: null,
+      flatRates: null,
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      notificationPrefs: defaultNotificationPrefs(),
+    })
+    console.log(`[db] created Owner account: ${email}`)
+  }
 }
 
 async function seedIfEmpty() {

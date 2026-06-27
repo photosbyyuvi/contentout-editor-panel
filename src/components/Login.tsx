@@ -100,21 +100,23 @@ export function Login() {
           </p>
         ) : null}
 
-        <div className="signin-demo">
-          <p className="signin-demo-label">Demo profiles (password: {MOCK_PASSWORD})</p>
-          <div className="signin-demo-list">
-            {USERS.filter((user) => user.status !== 'disabled').map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                className="chip"
-                onClick={() => quickFill(user.email)}
-              >
-                {user.fullName.split(' ')[0]} · {ROLE_LABELS[user.role]}
-              </button>
-            ))}
+        {!USE_BACKEND ? (
+          <div className="signin-demo">
+            <p className="signin-demo-label">Demo profiles (password: {MOCK_PASSWORD})</p>
+            <div className="signin-demo-list">
+              {USERS.filter((user) => user.status !== 'disabled').map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  className="chip"
+                  onClick={() => quickFill(user.email)}
+                >
+                  {user.fullName.split(' ')[0]} · {ROLE_LABELS[user.role]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </form>
     </div>
   )

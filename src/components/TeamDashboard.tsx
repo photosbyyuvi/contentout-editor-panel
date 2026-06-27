@@ -5,7 +5,7 @@ import { useApp } from '../store'
 import { isOwner } from '../permissions'
 import { PageHeader } from './PageHeader'
 import { NewProjectModal } from './NewProjectModal'
-import { NewClientModal } from './NewClientModal'
+import { ClientsModal } from './ClientsModal'
 import { StatusPill } from './StatusPill'
 import { dueLabel, formatCurrency, formatHours, monthKey } from '../format'
 import { useFakeLoad } from '../useFakeLoad'
@@ -79,7 +79,7 @@ export function TeamDashboard() {
         actions={
           <>
             <button type="button" className="secondary-button" onClick={() => setShowNewClient(true)}>
-              <Building2 size={14} /> Add client
+              <Building2 size={14} /> Clients
             </button>
             <button type="button" className="primary-button" onClick={() => setShowNewProject(true)}>
               <Plus size={14} /> New project
@@ -88,7 +88,7 @@ export function TeamDashboard() {
         }
       />
       {showNewProject ? <NewProjectModal onClose={() => setShowNewProject(false)} /> : null}
-      {showNewClient ? <NewClientModal onClose={() => setShowNewClient(false)} /> : null}
+      {showNewClient ? <ClientsModal onClose={() => setShowNewClient(false)} /> : null}
 
       {isLoading ? (
         <div className="hours-skeleton" aria-hidden="true">

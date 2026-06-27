@@ -147,6 +147,24 @@ export const repo = {
     await pool.query('INSERT INTO clients (id, data) VALUES ($1,$2)', [client.id, client])
     return client
   },
+  deleteClient: async (id) => {
+    await pool.query('DELETE FROM clients WHERE id = $1', [id])
+  },
+  deleteProject: async (id) => {
+    await pool.query('DELETE FROM projects WHERE id = $1', [id])
+  },
+  deleteTimeEntriesForProjects: async (projectIds) => {
+    if (projectIds.length === 0) {
+      return
+    }
+    await pool.query("DELETE FROM time_entries WHERE data->>'projectId' = ANY($1)", [projectIds])
+  },
+  deleteNotificationsForProjects: async (projectIds) => {
+    if (projectIds.length === 0) {
+      return
+    }
+    await pool.query("DELETE FROM notifications WHERE data->>'projectId' = ANY($1)", [projectIds])
+  },
   listProjects: async () => many((await pool.query('SELECT data FROM projects')).rows),
   getProject: async (id) => one((await pool.query('SELECT data FROM projects WHERE id = $1', [id])).rows),
   addProject: async (p) => {

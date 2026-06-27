@@ -239,6 +239,10 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
         await refresh()
         return client
       },
+      deleteClient: async (id, cascade) => {
+        await api.deleteClient(id, cascade)
+        await refresh()
+      },
       createProject: async (data) => {
         const { project } = await api.createProject(data)
         setProjects((prev) => [...prev, project])

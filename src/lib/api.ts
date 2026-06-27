@@ -103,6 +103,11 @@ export const api = {
     }),
   createClient: (name: string) =>
     request<{ client: Client }>('/api/clients', { method: 'POST', body: JSON.stringify({ name }) }),
+  deleteClient: (id: string, cascade: boolean) =>
+    request<{ ok: true; deletedProjects: number }>(
+      `/api/clients/${id}${cascade ? '?cascade=true' : ''}`,
+      { method: 'DELETE' },
+    ),
   createProject: (data: {
     title: string
     clientId: string

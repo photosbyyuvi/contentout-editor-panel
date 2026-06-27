@@ -452,6 +452,31 @@ app.post('/api/clients', auth, wrap(async (req, res) => {
   res.json({ client })
 }))
 
+app.delete('/api/clients/:id', auth, wrap(async (req, res) => {
+  if (!isManager(req.user)) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+  const clients = await repo.listClients()
+  const client = clients.find((c) => c.id === req.params.id)
+  if (!client) {
+    return res.status(404).json({ error: 'Client not found.' })
+  }
+  const projects = (await repo.listProjects()).filter((p) => p.clientId === req.params.id)
+  // Never orphan data: if projects are attached, require explicit cascade confirmation.
+  if (projects.length > 0 && req.query.cascade !== 'true') {
+    return res.status(409).json({ error: 'Client has attached projects.', projectCount: projects.length })
+  }
+  const projectIds = projects.map((p) => p.id)
+  await repo.deleteTimeEntriesForProjects(projectIds)
+  await repo.deleteNotificationsForProjects(projectIds)
+  for (const p of projects) {
+    await repo.deleteProject(p.id)
+  }
+  await repo.deleteClient(req.params.id)
+  await logActivity(req.user.id, `deleted client ${client.name}`, req.params.id)
+  res.json({ ok: true, deletedProjects: projects.length })
+}))
+
 app.post('/api/projects', auth, wrap(async (req, res) => {
   if (!isManager(req.user)) {
     return res.status(403).json({ error: 'Only managers can create projects.' })

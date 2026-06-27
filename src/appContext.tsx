@@ -54,6 +54,7 @@ export type AppContextValue = {
   changeRole: (userId: string, role: Role) => void
   setUserStatus: (userId: string, status: User['status']) => void
   createClient: (name: string) => Promise<Client>
+  deleteClient: (id: string, cascade: boolean) => Promise<void>
   createProject: (data: NewProjectInput) => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   markNotificationRead: (id: string) => void

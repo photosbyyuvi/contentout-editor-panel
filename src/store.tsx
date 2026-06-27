@@ -379,6 +379,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return client
   }, [])
 
+  const deleteClient = useCallback(async (id: string, cascade: boolean): Promise<void> => {
+    setProjects((prevProjects) => {
+      if (cascade) {
+        const removedIds = new Set(prevProjects.filter((p) => p.clientId === id).map((p) => p.id))
+        setTimeEntries((prevEntries) => prevEntries.filter((entry) => !removedIds.has(entry.projectId)))
+        return prevProjects.filter((p) => p.clientId !== id)
+      }
+      return prevProjects
+    })
+    setClients((prev) => prev.filter((client) => client.id !== id))
+  }, [])
+
   const createProject = useCallback(
     async (data: NewProjectInput) => {
       if (!actingUser) {
@@ -494,6 +506,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       changeRole,
       setUserStatus,
       createClient,
+      deleteClient,
       createProject,
       changePassword,
       markNotificationRead,
@@ -529,6 +542,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateProject,
       updateUser,
       createClient,
+      deleteClient,
       createProject,
       changePassword,
       inviteUser,

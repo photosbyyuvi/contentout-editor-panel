@@ -1,9 +1,11 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Inbox, SearchX } from 'lucide-react'
-import { useApp, useEditorProjects } from '../store'
+import { ArrowRight, CalendarDays, Inbox, LayoutList, SearchX } from 'lucide-react'
+import { useApp, useEditorProjects, useVisibleProjects } from '../store'
+import { isManager } from '../permissions'
 import { PageHeader } from './PageHeader'
 import { StatusPill } from './StatusPill'
+import { CalendarView } from './CalendarView'
 import { dueLabel, urgencyFor } from '../format'
 import { DELIVERABLE_LABELS, type ProjectStatus } from '../types'
 import { useFakeLoad } from '../useFakeLoad'
@@ -20,12 +22,24 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 ]
 
 export function Queue() {
-  const { user, clients } = useApp()
+  const { user, users, clients, timeEntries } = useApp()
   const projects = useEditorProjects()
+  const allVisible = useVisibleProjects()
   const isLoading = useFakeLoad()
+  const manager = isManager(user)
 
+  const [view, setView] = useState<'queue' | 'calendar'>('queue')
   const [clientFilter, setClientFilter] = useState<'all' | string>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const editors = useMemo(() => users.filter((u) => u.role === 'editor'), [users])
+  const [calEditorId, setCalEditorId] = useState<string>('')
+  const calEditorIdResolved = manager ? calEditorId || editors[0]?.id || '' : user?.id ?? ''
+  const calEditor = users.find((u) => u.id === calEditorIdResolved) ?? null
+  const calProjects = useMemo(
+    () => (manager ? allVisible.filter((p) => p.assignedEditorId === calEditorIdResolved) : projects),
+    [manager, allVisible, projects, calEditorIdResolved],
+  )
 
   const itemRefs = useRef<Record<string, HTMLLIElement | null>>({})
   const prevTops = useRef<Map<string, number>>(new Map())
@@ -97,8 +111,62 @@ export function Queue() {
 
   return (
     <>
-      <PageHeader eyebrow={`Welcome back, ${firstName}`} title="Queue" />
+      <PageHeader
+        eyebrow={`Welcome back, ${firstName}`}
+        title="Queue"
+        actions={
+          <div className="view-tabs" role="tablist" aria-label="View">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'queue'}
+              className={`view-tab ${view === 'queue' ? 'view-tab-active' : ''}`}
+              onClick={() => setView('queue')}
+            >
+              <LayoutList size={14} aria-hidden="true" /> Queue
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'calendar'}
+              className={`view-tab ${view === 'calendar' ? 'view-tab-active' : ''}`}
+              onClick={() => setView('calendar')}
+            >
+              <CalendarDays size={14} aria-hidden="true" /> Calendar
+            </button>
+          </div>
+        }
+      />
 
+      {view === 'calendar' ? (
+        <>
+          {manager ? (
+            <div className="filter-group cal-editor-pick">
+              <span className="filter-label">Editor</span>
+              <div className="chip-row">
+                {editors.map((ed) => (
+                  <button
+                    key={ed.id}
+                    type="button"
+                    className={`chip ${calEditorIdResolved === ed.id ? 'chip-active' : ''}`}
+                    onClick={() => setCalEditorId(ed.id)}
+                  >
+                    {ed.fullName.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <CalendarView
+            projects={calProjects}
+            clients={clients}
+            timeEntries={timeEntries}
+            editor={calEditor}
+            timezone={calEditor?.timezone ?? user?.timezone ?? 'UTC'}
+          />
+        </>
+      ) : (
+      <>
       <div className="summary-strip" role="status">
         <span className="tabular">{summary.active} active</span>
         <span className="dot-sep" aria-hidden="true">·</span>
@@ -226,6 +294,8 @@ export function Queue() {
             )
           })}
         </ul>
+      )}
+      </>
       )}
     </>
   )

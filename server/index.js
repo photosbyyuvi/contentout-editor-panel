@@ -397,13 +397,55 @@ app.patch('/api/projects/:id', auth, wrap(async (req, res) => {
   if (!project) {
     return res.status(404).json({ error: 'Not found' })
   }
-  if (typeof req.body?.title === 'string' && req.body.title.trim()) {
-    project.title = req.body.title.trim()
+  const body = req.body || {}
+  const DELIVERABLES = ['reel', 'long_form', 'photo_cull', 'photo_retouch', 'batch_graphics']
+  const STATUSES = ['not_started', 'editing', 'submitted', 'revisions_requested', 'approved']
+
+  if (typeof body.title === 'string' && body.title.trim()) {
+    project.title = body.title.trim()
   }
-  if (typeof req.body?.brief === 'string' && req.body.brief.trim()) {
-    project.brief = req.body.brief.trim()
+  if (typeof body.brief === 'string') {
+    project.brief = body.brief.trim()
+  }
+  if (typeof body.deliverableType === 'string') {
+    if (!DELIVERABLES.includes(body.deliverableType)) {
+      return res.status(400).json({ error: 'Invalid deliverable type.' })
+    }
+    project.deliverableType = body.deliverableType
+  }
+  if (body.dueDate !== undefined) {
+    const parsed = new Date(body.dueDate)
+    if (Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ error: 'Invalid due date.' })
+    }
+    project.dueDate = parsed.toISOString()
+  }
+  let reassignedTo = null
+  if (body.assignedEditorId !== undefined) {
+    const next = body.assignedEditorId || null
+    if (next) {
+      const editor = await repo.getUser(next)
+      if (!editor || editor.role !== 'editor') {
+        return res.status(400).json({ error: 'Assignee must be an editor.' })
+      }
+    }
+    if (next && next !== project.assignedEditorId) {
+      reassignedTo = next
+    }
+    project.assignedEditorId = next
+  }
+  if (typeof body.status === 'string') {
+    if (!STATUSES.includes(body.status)) {
+      return res.status(400).json({ error: 'Invalid status.' })
+    }
+    project.status = body.status
+    project.approvedAt = body.status === 'approved' ? project.approvedAt || now() : null
   }
   await repo.saveProject(project)
+  await logActivity(req.user.id, 'edited project', project.id)
+  if (reassignedTo) {
+    await createNotification(reassignedTo, 'assignment', project.id, `Project assigned to you: ${project.title}`)
+  }
   res.json({ project })
 }))
 

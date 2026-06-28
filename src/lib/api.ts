@@ -7,6 +7,7 @@ import type {
   NotificationPrefs,
   PayModel,
   Project,
+  ProjectStatus,
   Role,
   TimeEntry,
   User,
@@ -95,7 +96,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ body }),
     }),
-  patchProject: (projectId: string, patch: { title?: string; brief?: string }) =>
+  patchProject: (
+    projectId: string,
+    patch: {
+      title?: string
+      brief?: string
+      deliverableType?: DeliverableType
+      dueDate?: string
+      assignedEditorId?: string | null
+      status?: ProjectStatus
+    },
+  ) =>
     request<{ project: Project }>(`/api/projects/${projectId}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),

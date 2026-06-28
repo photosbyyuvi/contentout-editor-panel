@@ -220,7 +220,18 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       requestChanges: (projectId, notes) =>
         void projectAction(() => api.review(projectId, 'changes_requested', notes), 'Changes requested'),
       updateProject: (projectId, patch) =>
-        void projectAction(() => api.patchProject(projectId, { title: patch.title, brief: patch.brief })),
+        void projectAction(
+          () =>
+            api.patchProject(projectId, {
+              title: patch.title,
+              brief: patch.brief,
+              deliverableType: patch.deliverableType,
+              dueDate: patch.dueDate,
+              assignedEditorId: patch.assignedEditorId,
+              status: patch.status,
+            }),
+          'Project updated',
+        ),
       updateUser: (userId, patch) => void run(() => api.updateUser(userId, patch)),
       inviteUser: async (fullName, email, role) => {
         try {

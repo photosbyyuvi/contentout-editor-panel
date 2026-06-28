@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Check, ExternalLink, Pencil, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Check, ExternalLink, Pencil, Sparkles } from 'lucide-react'
 import { useApp } from '../store'
-import { isManager, canEditAnything } from '../permissions'
+import { isManager, canManageProjects } from '../permissions'
 import { NotificationBell } from './NotificationBell'
 import { StatusPill } from './StatusPill'
+import { EditProjectModal } from './EditProjectModal'
 import { fullDateTime, relativeTime, formatHours } from '../format'
 import { todayInputValue, validateHours } from '../validation'
 import { useFakeLoad } from '../useFakeLoad'
@@ -25,7 +26,6 @@ export function ProjectDetail() {
     requestChanges,
     addComment,
     logHours,
-    updateProject,
   } = useApp()
   const isLoading = useFakeLoad()
 
@@ -41,9 +41,7 @@ export function ProjectDetail() {
   const [hoursError, setHoursError] = useState<string | null>(null)
   const [aiSummary, setAiSummary] = useState<string[] | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [titleDraft, setTitleDraft] = useState('')
-  const [briefDraft, setBriefDraft] = useState('')
+  const [showEdit, setShowEdit] = useState(false)
 
   const client = clients.find((item) => item.id === project?.clientId)
   const userName = (id: string) => users.find((candidate) => candidate.id === id)?.fullName ?? 'Someone'
@@ -125,16 +123,6 @@ export function ProjectDetail() {
     })
   }
 
-  const startEdit = () => {
-    setTitleDraft(project.title)
-    setBriefDraft(project.brief)
-    setEditing(true)
-  }
-  const saveEdit = () => {
-    updateProject(project.id, { title: titleDraft.trim() || project.title, brief: briefDraft.trim() || project.brief })
-    setEditing(false)
-  }
-
   const primaryAction = () => {
     if (!isAssignedEditor) {
       return null
@@ -201,16 +189,7 @@ export function ProjectDetail() {
             <span className="client-dot" style={{ backgroundColor: client?.accentColor }} aria-hidden="true" />
             {client?.name}
           </span>
-          {editing ? (
-            <input
-              className="edit-title-input"
-              value={titleDraft}
-              onChange={(event) => setTitleDraft(event.target.value)}
-              aria-label="Project title"
-            />
-          ) : (
-            <h1 className="page-title">{project.title}</h1>
-          )}
+          <h1 className="page-title">{project.title}</h1>
           <StatusPill key={project.status} status={project.status} />
         </div>
         <div className="detail-action">
@@ -218,21 +197,15 @@ export function ProjectDetail() {
           {isAssignedEditor && needsLink && effectiveLink.length === 0 ? (
             <p className="helper">Add a delivery link to submit.</p>
           ) : null}
-          {canEditAnything(user) ? (
-            editing ? (
-              <div className="owner-edit-actions">
-                <button type="button" className="secondary-button" onClick={saveEdit}>
-                  <Check size={14} /> Save
-                </button>
-                <button type="button" className="ghost-button" onClick={() => setEditing(false)}>
-                  <X size={14} /> Cancel
-                </button>
-              </div>
-            ) : (
-              <button type="button" className="ghost-button owner-edit" onClick={startEdit} title="Owner override: edit this project">
-                <Pencil size={14} /> Edit
-              </button>
-            )
+          {canManageProjects(user) ? (
+            <button
+              type="button"
+              className="secondary-button edit-project-btn"
+              onClick={() => setShowEdit(true)}
+              title="Edit due date, assignment, deliverable, status, and brief"
+            >
+              <Pencil size={14} /> Edit project
+            </button>
           ) : null}
         </div>
       </header>
@@ -269,17 +242,7 @@ export function ProjectDetail() {
 
           <section className="surface">
             <h2 className="section-head">Brief</h2>
-            {editing ? (
-              <textarea
-                className="edit-brief"
-                value={briefDraft}
-                onChange={(event) => setBriefDraft(event.target.value)}
-                rows={4}
-                aria-label="Project brief"
-              />
-            ) : (
-              <p className="prose">{project.brief}</p>
-            )}
+            <p className="prose">{project.brief}</p>
           </section>
 
           <section className="surface">
@@ -528,6 +491,8 @@ export function ProjectDetail() {
           )}
         </aside>
       </div>
+
+      {showEdit ? <EditProjectModal project={project} onClose={() => setShowEdit(false)} /> : null}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
 import { StatusPill } from './StatusPill'
@@ -48,10 +48,11 @@ export function CalendarView({
   const todayKey = localKey(new Date().toISOString(), timezone)
   const [todayY, todayM] = todayKey.split('-').map(Number)
   const [cursor, setCursor] = useState({ year: todayY, month: todayM - 1 })
-  const [dir, setDir] = useState(0)
+  const dirRef = useRef(0)
   const [detail, setDetail] = useState<Project | null>(null)
   const [dayKey, setDayKey] = useState<string | null>(null)
   const isMobile = useMediaQuery('(max-width: 768px)')
+  const gridRef = useRef<HTMLDivElement>(null)
 
   const clientById = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients])
 
@@ -85,7 +86,7 @@ export function CalendarView({
   }, [editor, projects, timeEntries, timezone, displayedMonthKey])
 
   const go = (delta: number) => {
-    setDir(delta)
+    dirRef.current = delta
     setCursor((c) => {
       const m = c.month + delta
       if (m < 0) {
@@ -98,9 +99,35 @@ export function CalendarView({
     })
   }
   const goToday = () => {
-    setDir(0)
+    dirRef.current = cursor.year * 12 + cursor.month > todayY * 12 + (todayM - 1) ? -1 : 1
     setCursor({ year: todayY, month: todayM - 1 })
   }
+
+  // Slide + fade the rendered month in on each change. useLayoutEffect runs
+  // before paint so the start frame applies (no opacity-1 flash); the Web
+  // Animations API reliably retriggers on the persistent grid/agenda node.
+  const firstPaint = useRef(true)
+  useLayoutEffect(() => {
+    const el = gridRef.current
+    if (!el || typeof el.animate !== 'function') {
+      return
+    }
+    if (firstPaint.current) {
+      firstPaint.current = false
+      return
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return
+    }
+    const offset = dirRef.current >= 0 ? 28 : -28
+    el.animate(
+      [
+        { opacity: 0, transform: `translateX(${offset}px)` },
+        { opacity: 1, transform: 'translateX(0)' },
+      ],
+      { duration: 280, easing: 'cubic-bezier(0.2, 0, 0, 1)', fill: 'backwards' },
+    )
+  }, [displayedMonthKey, isMobile])
 
   const cells = useMemo(() => buildGrid(cursor.year, cursor.month, todayKey), [cursor, todayKey])
 
@@ -155,7 +182,7 @@ export function CalendarView({
       </div>
 
       {isMobile ? (
-        <div className="cal-agenda" key={displayedMonthKey}>
+        <div className="cal-agenda" ref={gridRef}>
           {agendaDays.length === 0 ? (
             <p className="muted cal-empty">Nothing due in {monthLabel}.</p>
           ) : (
@@ -177,10 +204,7 @@ export function CalendarView({
               <div key={d} className="cal-weekday">{d}</div>
             ))}
           </div>
-          <div
-            className={`cal-grid ${dir > 0 ? 'cal-slide-next' : dir < 0 ? 'cal-slide-prev' : 'cal-fade'}`}
-            key={displayedMonthKey}
-          >
+          <div className="cal-grid" ref={gridRef}>
             {cells.map((c) => {
               const items = byDay[c.key] ?? []
               const shown = items.slice(0, 3)

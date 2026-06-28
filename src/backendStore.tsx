@@ -256,6 +256,12 @@ export function BackendAppProvider({ children }: { children: ReactNode }) {
       },
       deleteClient: async (id, cascade) => {
         await api.deleteClient(id, cascade)
+        // Optimistically drop the client (and, on cascade, its projects) so the
+        // views behind the modal update instantly; refresh reconciles the rest.
+        setClients((prev) => prev.filter((c) => c.id !== id))
+        if (cascade) {
+          setProjects((prev) => prev.filter((p) => p.clientId !== id))
+        }
         await refresh()
       },
       createProject: async (data) => {
